@@ -282,6 +282,133 @@ const VirtualKeyboard: React.FC = () => {
     return closest;
   };
 
+  // Componente de Settings
+  const SettingsPanel = () => (
+    <div
+      className={`fixed inset-0 bg-black bg-opacity-50 z-30 ${
+        showSettings ? "flex" : "hidden"
+      } items-center justify-center p-4`}
+    >
+      <div
+        className={`relative w-full max-w-md p-6 rounded-xl shadow-lg ${
+          settings.theme === "dark"
+            ? "bg-gray-800"
+            : settings.theme === "high-contrast"
+            ? "bg-black border-2 border-yellow-300"
+            : "bg-white"
+        }`}
+      >
+        <button
+          onClick={() => setShowSettings(false)}
+          className="absolute top-4 right-4"
+        >
+          <X className="w-6 h-6" />
+        </button>
+        <h2 className="text-xl font-bold mb-4">Configuración</h2>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block mb-2">Tiempo de pulsación (segundos)</label>
+            <input
+              type="range"
+              min="0.1"
+              max="2"
+              step="0.1"
+              value={settings.holdTime}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  holdTime: parseFloat(e.target.value),
+                }))
+              }
+              className="w-full"
+            />
+            <span className="text-sm">{settings.holdTime}s</span>
+          </div>
+
+          <div>
+            <label className="block mb-2">Tamaño de teclas (%)</label>
+            <input
+              type="range"
+              min="1"
+              max="6"
+              step="0.5"
+              value={settings.keySize}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  keySize: parseFloat(e.target.value),
+                }))
+              }
+              className="w-full"
+            />
+            <span className="text-sm">
+              {Math.round((settings.keySize * 100) / 3.5)}%
+            </span>
+          </div>
+
+          <div>
+            <label className="block mb-2">Tamaño de texto (%)</label>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.25"
+              value={settings.fontSize}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  fontSize: parseFloat(e.target.value),
+                }))
+              }
+              className="w-full"
+            />
+            <span className="text-sm">
+              {Math.round(settings.fontSize * 100)}%
+            </span>
+          </div>
+
+          <div>
+            <label className="block mb-2">Distribución</label>
+            <select
+              value={settings.layout}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  layout: e.target.value as "qwerty" | "abc",
+                }))
+              }
+              className={`w-full p-2 rounded ${
+                settings.theme === "dark"
+                  ? "bg-gray-700"
+                  : settings.theme === "high-contrast"
+                  ? "bg-black border border-yellow-300"
+                  : "bg-white"
+              }`}
+            >
+              <option value="qwerty">QWERTY</option>
+              <option value="abc">ABC</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label>Sonido</label>
+            <button
+              onClick={() =>
+                setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
+              }
+              className={`px-4 py-2 rounded ${
+                settings.soundEnabled ? "bg-green-500" : "bg-gray-500"
+              }`}
+            >
+              {settings.soundEnabled ? "Activado" : "Desactivado"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div
       className={`min-h-screen relative ${
@@ -371,15 +498,24 @@ const VirtualKeyboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Espacio para la barra superior */}
+      <SettingsPanel />
+
+      {/* Espacio para la barra superior y área de texto */}
       <div
-        className={`${
-          showTextArea ? "h-[calc(40vh+4rem)]" : "h-16"
-        } transition-all duration-300`}
-      ></div>
+        style={{
+          height: showTextArea ? "calc(40vh + 4rem)" : "4rem",
+          transition: "height 300ms ease-in-out",
+        }}
+      />
 
       {/* Área del teclado con scroll independiente */}
-      <div className="fixed top-[calc(40vh+4rem)] bottom-0 left-0 right-0 overflow-y-auto bg-inherit">
+      <div
+        className="fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit"
+        style={{
+          top: showTextArea ? "calc(40vh + 4rem)" : "4rem",
+          transition: "top 300ms ease-in-out",
+        }}
+      >
         <div
           ref={containerRef}
           className="virtual-keyboard w-full mx-auto p-4 pb-20"
