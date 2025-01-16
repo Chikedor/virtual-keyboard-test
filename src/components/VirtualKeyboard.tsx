@@ -13,6 +13,7 @@ interface KeyboardSettings {
   scanningEnabled: boolean;
   keySize: number;
   fontSize: number;
+  textareaFontSize: number;
   spacing: number;
   layout: "qwerty" | "abc";
 }
@@ -51,6 +52,7 @@ const VirtualKeyboard: React.FC = () => {
     scanningEnabled: false,
     keySize: 3.5,
     fontSize: 1.25,
+    textareaFontSize: 1.25,
     spacing: 2,
     layout: "qwerty",
   });
@@ -133,7 +135,25 @@ const VirtualKeyboard: React.FC = () => {
 
   const calculateLayout = useCallback(() => {
     if (!containerRef.current) return [];
-    return LAYOUTS[settings.layout];
+    const rows = LAYOUTS[settings.layout];
+
+    // Calcular el número de teclas en la última fila sin contar el espacio
+    const lastRowKeysWithoutSpace = rows[rows.length - 1].filter(
+      (k) => k !== "␣"
+    ).length;
+    const maxKeysPerRow = Math.max(...rows.map((row) => row.length));
+
+    // Calcular cuántos espacios necesitamos añadir
+    const spacesToAdd = maxKeysPerRow - lastRowKeysWithoutSpace - 1; // -1 por el espacio existente
+
+    // Crear una nueva última fila con los espacios distribuidos
+    const modifiedLastRow = [...rows[rows.length - 1]];
+    const spaceIndex = modifiedLastRow.indexOf("␣");
+    if (spaceIndex !== -1) {
+      modifiedLastRow[spaceIndex] = "␣".repeat(spacesToAdd + 1);
+    }
+
+    return [...rows.slice(0, -1), modifiedLastRow];
   }, [settings.layout]);
 
   const [layout, setLayout] = useState<string[][]>([]);
@@ -258,7 +278,9 @@ const VirtualKeyboard: React.FC = () => {
           </div>
 
           <div>
-            <label className="block mb-2">Tamaño de texto (%)</label>
+            <label className="block mb-2">
+              Tamaño de texto del teclado (%)
+            </label>
             <input
               type="range"
               min="0.5"
@@ -275,6 +297,27 @@ const VirtualKeyboard: React.FC = () => {
             />
             <span className="text-sm">
               {Math.round(settings.fontSize * 100)}%
+            </span>
+          </div>
+
+          <div>
+            <label className="block mb-2">Tamaño de texto del área (%)</label>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.25"
+              value={settings.textareaFontSize}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  textareaFontSize: parseFloat(e.target.value),
+                }))
+              }
+              className="w-full"
+            />
+            <span className="text-sm">
+              {Math.round(settings.textareaFontSize * 100)}%
             </span>
           </div>
 
@@ -332,7 +375,7 @@ const VirtualKeyboard: React.FC = () => {
       {/* Barra superior fija */}
       <div className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg">
         <div className="flex justify-between items-center p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-1">
             <h1 className="text-2xl font-bold">Teclado Accesible</h1>
             <button
               onClick={() => setShowTextArea(!showTextArea)}
@@ -346,8 +389,19 @@ const VirtualKeyboard: React.FC = () => {
             >
               {showTextArea ? "Ocultar Texto" : "Mostrar Texto"}
             </button>
+            <div
+              className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap ${
+                settings.theme === "dark"
+                  ? "bg-gray-800"
+                  : settings.theme === "high-contrast"
+                  ? "bg-black border border-yellow-300"
+                  : "bg-gray-200"
+              }`}
+            >
+              {input}
+            </div>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 ml-4">
             {settings.soundEnabled ? (
               <Volume2
                 className="w-6 h-6 cursor-pointer"
@@ -401,7 +455,7 @@ const VirtualKeyboard: React.FC = () => {
               style={{
                 height: "40vh",
                 resize: "none",
-                fontSize: `${settings.fontSize}em`,
+                fontSize: `${settings.textareaFontSize}em`,
               }}
             />
           </div>
@@ -465,13 +519,14 @@ const VirtualKeyboard: React.FC = () => {
           {layout.map((row, rowIndex) => (
             <div
               key={rowIndex}
-              className="flex flex-wrap gap-1 justify-center mb-1"
+              className="flex justify-between gap-1 px-2 mb-1"
             >
               {row.map((key) => {
                 const keySize = getKeySize();
-                const isSpaceKey = key === "␣";
+                const isSpaceKey = key.includes("␣");
                 const isBackspaceKey = key === "⌫";
-                const width = isSpaceKey ? keySize * 3 : keySize;
+                const spaceMultiplier = isSpaceKey ? key.length : 1;
+                const width = keySize * spaceMultiplier;
 
                 return (
                   <button
