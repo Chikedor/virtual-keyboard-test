@@ -22,12 +22,12 @@ const LAYOUTS = {
   qwerty: [
     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
     ["A", "S", "D", "F", "G", "H", "J", "K", "L", "⌫"],
-    ["Z", "X", "C", "V", "B", "N", "M", "space"],
+    ["Z", "X", "C", "V", "B", "N", "M", "␣"],
   ],
   abc: [
     ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
     ["K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"],
-    ["U", "V", "W", "X", "Y", "Z", "⌫", "space"],
+    ["U", "V", "W", "X", "Y", "Z", "⌫", "␣"],
   ],
 };
 
@@ -115,7 +115,7 @@ const VirtualKeyboard: React.FC = () => {
 
         if (key === "⌫" || key === "backspace") {
           setInput((prev) => prev.slice(0, -1));
-        } else if (key === "space") {
+        } else if (key === "␣" || key === "space") {
           setInput((prev) => prev + " ");
         } else {
           setInput((prev) => prev + key);
@@ -434,14 +434,20 @@ const VirtualKeyboard: React.FC = () => {
               e.touches[0].clientX,
               e.touches[0].clientY
             );
-            if (key) handleKeyDown(key.toLowerCase());
+            if (key) {
+              const isSpecial = key === "⌫" || key === "␣";
+              handleKeyDown(isSpecial ? key : key.toLowerCase());
+            }
           }}
           onTouchEnd={(e) => {
             const key = findClosestKey(
               e.changedTouches[0].clientX,
               e.changedTouches[0].clientY
             );
-            if (key) handleKeyUp(key.toLowerCase());
+            if (key) {
+              const isSpecial = key === "⌫" || key === "␣";
+              handleKeyUp(isSpecial ? key : key.toLowerCase());
+            }
           }}
           onTouchMove={(e) => {
             e.preventDefault();
@@ -451,48 +457,71 @@ const VirtualKeyboard: React.FC = () => {
             );
             if (key && key !== activeKey) {
               if (activeKey) handleKeyUp(activeKey);
-              handleKeyDown(key.toLowerCase());
+              const isSpecial = key === "⌫" || key === "␣";
+              handleKeyDown(isSpecial ? key : key.toLowerCase());
             }
           }}
         >
           {layout.map((row, rowIndex) => (
             <div
               key={rowIndex}
-              className="flex flex-nowrap gap-1 justify-center mb-1"
+              className="flex flex-wrap gap-1 justify-center mb-1"
             >
               {row.map((key) => {
                 const keySize = getKeySize();
-                const isSpaceKey = key === "space";
+                const isSpaceKey = key === "␣";
                 const isBackspaceKey = key === "⌫";
                 const width = isSpaceKey ? keySize * 3 : keySize;
 
                 return (
                   <button
                     key={key}
-                    onMouseDown={() => handleKeyDown(key.toLowerCase())}
-                    onMouseUp={() => handleKeyUp(key.toLowerCase())}
-                    onMouseLeave={() => handleKeyUp(key.toLowerCase())}
-                    onTouchStart={() => handleKeyDown(key.toLowerCase())}
-                    onTouchEnd={() => handleKeyUp(key.toLowerCase())}
+                    onMouseDown={() => {
+                      const processedKey =
+                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
+                      handleKeyDown(processedKey);
+                    }}
+                    onMouseUp={() => {
+                      const processedKey =
+                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
+                      handleKeyUp(processedKey);
+                    }}
+                    onMouseLeave={() => {
+                      const processedKey =
+                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
+                      handleKeyUp(processedKey);
+                    }}
+                    onTouchStart={() => {
+                      const processedKey =
+                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
+                      handleKeyDown(processedKey);
+                    }}
+                    onTouchEnd={() => {
+                      const processedKey =
+                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
+                      handleKeyUp(processedKey);
+                    }}
                     className={`
                       font-semibold rounded-xl transition-all duration-200
                       ${
-                        activeKey === key.toLowerCase()
+                        activeKey ===
+                        (isSpaceKey || isBackspaceKey ? key : key.toLowerCase())
                           ? "scale-95"
                           : "scale-100"
                       }
                       ${getThemeClasses(settings.theme)}
                       shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
                       flex items-center justify-center touch-manipulation
+                      ${isSpaceKey ? "text-2xl" : ""}
                     `}
                     style={{
                       width: `${width}px`,
                       height: `${keySize}px`,
-                      fontSize: `${settings.fontSize}em`,
+                      fontSize: isSpaceKey ? "1.5em" : `${settings.fontSize}em`,
                       minWidth: `${keySize}px`,
                     }}
                   >
-                    {isSpaceKey ? "Espacio" : key}
+                    {key}
                   </button>
                 );
               })}
