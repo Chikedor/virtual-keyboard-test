@@ -258,6 +258,29 @@ const VirtualKeyboard: React.FC = () => {
     return baseSize * userSizeMultiplier;
   }, [calculateBaseKeySize, settings.keySize]);
 
+  const findClosestKey = (x: number, y: number) => {
+    if (!containerRef.current) return null;
+    const elements = containerRef.current.getElementsByTagName("button");
+    let closest = null;
+    let minDistance = Infinity;
+
+    for (const element of elements) {
+      const rect = element.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const distance = Math.sqrt(
+        Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = element.textContent;
+      }
+    }
+
+    return closest;
+  };
+
   return (
     <div
       className={`min-h-screen relative overflow-x-hidden ${
@@ -482,128 +505,164 @@ const VirtualKeyboard: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="p-4 pb-20">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">Teclado Accesible</h1>
-          <div className="flex gap-4">
-            {settings.soundEnabled ? (
-              <Volume2
+      <div className="p-4 pb-20 min-h-screen">
+        {/* Header y área de texto fija */}
+        <div className="fixed top-0 left-0 right-0 bg-inherit z-10 p-4 shadow-lg">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">Teclado Accesible</h1>
+            <div className="flex gap-4">
+              {settings.soundEnabled ? (
+                <Volume2
+                  className="w-6 h-6 cursor-pointer"
+                  onClick={() =>
+                    setSettings((s) => ({ ...s, soundEnabled: false }))
+                  }
+                />
+              ) : (
+                <VolumeX
+                  className="w-6 h-6 cursor-pointer"
+                  onClick={() =>
+                    setSettings((s) => ({ ...s, soundEnabled: true }))
+                  }
+                />
+              )}
+              {settings.theme === "light" ? (
+                <Moon
+                  className="w-6 h-6 cursor-pointer"
+                  onClick={() => setSettings((s) => ({ ...s, theme: "dark" }))}
+                />
+              ) : (
+                <Sun
+                  className="w-6 h-6 cursor-pointer"
+                  onClick={() => setSettings((s) => ({ ...s, theme: "light" }))}
+                />
+              )}
+              <Settings
                 className="w-6 h-6 cursor-pointer"
-                onClick={() =>
-                  setSettings((s) => ({ ...s, soundEnabled: false }))
-                }
+                onClick={() => setShowSettings(true)}
               />
-            ) : (
-              <VolumeX
-                className="w-6 h-6 cursor-pointer"
-                onClick={() =>
-                  setSettings((s) => ({ ...s, soundEnabled: true }))
-                }
-              />
-            )}
-            {settings.theme === "light" ? (
-              <Moon
-                className="w-6 h-6 cursor-pointer"
-                onClick={() => setSettings((s) => ({ ...s, theme: "dark" }))}
-              />
-            ) : (
-              <Sun
-                className="w-6 h-6 cursor-pointer"
-                onClick={() => setSettings((s) => ({ ...s, theme: "light" }))}
-              />
-            )}
-            <Settings
-              className="w-6 h-6 cursor-pointer"
-              onClick={() => setShowSettings(true)}
+            </div>
+          </div>
+
+          {/* Input Area */}
+          <div className="mb-6">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className={`w-full p-4 rounded-lg border-2 transition-all ${
+                settings.theme === "dark"
+                  ? "bg-gray-800 border-gray-600 text-gray-100 focus:border-blue-400 focus:ring focus:ring-blue-400/20"
+                  : settings.theme === "high-contrast"
+                  ? "bg-black border-yellow-300 text-yellow-300 focus:border-yellow-400 focus:ring focus:ring-yellow-400/20"
+                  : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring focus:ring-blue-200"
+              }`}
+              style={{
+                minHeight: "100px",
+                fontSize: `${settings.fontSize}em`,
+              }}
             />
-          </div>
-        </div>
-
-        {/* Input Area */}
-        <div className="mb-6">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className={`w-full p-4 rounded-lg border-2 transition-all ${
-              settings.theme === "dark"
-                ? "bg-gray-800 border-gray-600 text-gray-100 focus:border-blue-400 focus:ring focus:ring-blue-400/20"
-                : settings.theme === "high-contrast"
-                ? "bg-black border-yellow-300 text-yellow-300 focus:border-yellow-400 focus:ring focus:ring-yellow-400/20"
-                : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring focus:ring-blue-200"
-            }`}
-            style={{
-              minHeight: "100px",
-              fontSize: `${settings.fontSize}em`,
-            }}
-          />
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-            {predictions.map((word, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  const words = input.split(" ");
-                  words.pop();
-                  setInput([...words, word].join(" ") + " ");
-                }}
-                className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
-                  settings.theme === "dark"
-                    ? "bg-blue-900 text-blue-100 hover:bg-blue-800"
-                    : settings.theme === "high-contrast"
-                    ? "bg-yellow-300 text-black hover:bg-yellow-400"
-                    : "bg-blue-100 text-blue-800 hover:bg-blue-200"
-                }`}
-                style={{ fontSize: `${settings.fontSize}em` }}
-              >
-                {word}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Virtual Keyboard */}
-      <div ref={containerRef} className="virtual-keyboard w-full mx-auto p-4">
-        {layout.map((row, rowIndex) => (
-          <div
-            key={rowIndex}
-            className="flex flex-wrap gap-2 justify-center mb-2"
-          >
-            {row.map((key) => {
-              const keySize = getKeySize();
-              const isSpaceKey = key.toLowerCase() === "space";
-              const isBackspaceKey = key.toLowerCase() === "backspace";
-              const width = isSpaceKey ? keySize * 4 : keySize;
-
-              return (
+            <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+              {predictions.map((word, i) => (
                 <button
-                  key={key}
-                  onMouseDown={() => handleKeyDown(key.toLowerCase())}
-                  onMouseUp={() => handleKeyUp(key.toLowerCase())}
-                  onMouseLeave={() => handleKeyUp(key.toLowerCase())}
-                  onTouchStart={() => handleKeyDown(key.toLowerCase())}
-                  onTouchEnd={() => handleKeyUp(key.toLowerCase())}
-                  className={`
-                    font-semibold rounded-xl transition-all duration-200
-                    ${
-                      activeKey === key.toLowerCase() ? "scale-95" : "scale-100"
-                    }
-                    ${getThemeClasses(settings.theme)}
-                    shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
-                    flex items-center justify-center touch-manipulation
-                  `}
-                  style={{
-                    width: `${width}px`,
-                    height: `${keySize}px`,
-                    fontSize: `${settings.fontSize}em`,
+                  key={i}
+                  onClick={() => {
+                    const words = input.split(" ");
+                    words.pop();
+                    setInput([...words, word].join(" ") + " ");
                   }}
+                  className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
+                    settings.theme === "dark"
+                      ? "bg-blue-900 text-blue-100 hover:bg-blue-800"
+                      : settings.theme === "high-contrast"
+                      ? "bg-yellow-300 text-black hover:bg-yellow-400"
+                      : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                  }`}
+                  style={{ fontSize: `${settings.fontSize}em` }}
                 >
-                  {isBackspaceKey ? "⌫" : isSpaceKey ? "Espacio" : key}
+                  {word}
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        ))}
+        </div>
+
+        {/* Espacio para el contenido fijo */}
+        <div className="h-[calc(220px+4rem)]"></div>
+
+        {/* Virtual Keyboard - Área interactiva */}
+        <div
+          ref={containerRef}
+          className="virtual-keyboard w-full mx-auto p-4"
+          onTouchStart={(e) => {
+            const key = findClosestKey(
+              e.touches[0].clientX,
+              e.touches[0].clientY
+            );
+            if (key) handleKeyDown(key.toLowerCase());
+          }}
+          onTouchEnd={(e) => {
+            const key = findClosestKey(
+              e.changedTouches[0].clientX,
+              e.changedTouches[0].clientY
+            );
+            if (key) handleKeyUp(key.toLowerCase());
+          }}
+          onTouchMove={(e) => {
+            e.preventDefault();
+            const key = findClosestKey(
+              e.touches[0].clientX,
+              e.touches[0].clientY
+            );
+            if (key && key !== activeKey) {
+              if (activeKey) handleKeyUp(activeKey);
+              handleKeyDown(key.toLowerCase());
+            }
+          }}
+        >
+          {layout.map((row, rowIndex) => (
+            <div
+              key={rowIndex}
+              className="flex flex-wrap gap-2 justify-center mb-2"
+            >
+              {row.map((key) => {
+                const keySize = getKeySize();
+                const isSpaceKey = key.toLowerCase() === "space";
+                const isBackspaceKey = key.toLowerCase() === "backspace";
+                const width = isSpaceKey ? keySize * 4 : keySize;
+
+                return (
+                  <button
+                    key={key}
+                    onMouseDown={() => handleKeyDown(key.toLowerCase())}
+                    onMouseUp={() => handleKeyUp(key.toLowerCase())}
+                    onMouseLeave={() => handleKeyUp(key.toLowerCase())}
+                    onTouchStart={() => handleKeyDown(key.toLowerCase())}
+                    onTouchEnd={() => handleKeyUp(key.toLowerCase())}
+                    className={`
+                      font-semibold rounded-xl transition-all duration-200
+                      ${
+                        activeKey === key.toLowerCase()
+                          ? "scale-95"
+                          : "scale-100"
+                      }
+                      ${getThemeClasses(settings.theme)}
+                      shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
+                      flex items-center justify-center touch-manipulation
+                    `}
+                    style={{
+                      width: `${width}px`,
+                      height: `${keySize}px`,
+                      fontSize: `${settings.fontSize}em`,
+                    }}
+                  >
+                    {isBackspaceKey ? "⌫" : isSpaceKey ? "Espacio" : key}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
