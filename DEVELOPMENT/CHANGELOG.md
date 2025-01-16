@@ -22,6 +22,8 @@
 - Display de texto en tiempo real en la barra superior
 - Distribución uniforme de teclas a lo ancho
 - Espacio adaptativo en última fila
+- Documentación completa en inglés (README.md)
+- Sistema de redistribución de teclas en múltiples filas
 
 ### Changed
 
@@ -39,11 +41,13 @@
 - Símbolos especiales más intuitivos (⌫, ␣)
 - Distribución en cuadrícula uniforme
 - Manejo mejorado de teclas especiales
+- Modificado el sistema de layout para evitar scroll horizontal
+- Reducido el número máximo de teclas por fila de 10 a 6
+- Aumentado el tamaño base de las teclas
 
 ### Fixed
 
 - Prevención de scroll en dispositivos táctiles
-
 - Mejorado el soporte para pantalla completa eliminando límite de ancho máximo
 - Aumentado el rango de tamaño de teclas (max: 6.0)
 - Aumentado el rango de tamaño de fuente (max: 5em)
@@ -54,7 +58,9 @@
 - Manejo de teclas especiales (backspace y espacio)
 - Distribución responsiva del teclado
 - Cálculo del espacio en última fila
+- Problemas con teclas grandes generando scroll horizontal
 
 ### Removed
 
 - Predicción de palabras (temporalmente)
+- Límite de ancho máximo en teclas grandes
