@@ -20,64 +20,14 @@ interface KeyboardSettings {
 // Definir las teclas en ambos órdenes
 const LAYOUTS = {
   qwerty: [
-    "Q",
-    "W",
-    "E",
-    "R",
-    "T",
-    "Y",
-    "U",
-    "I",
-    "O",
-    "P",
-    "A",
-    "S",
-    "D",
-    "F",
-    "G",
-    "H",
-    "J",
-    "K",
-    "L",
-    "Z",
-    "X",
-    "C",
-    "V",
-    "B",
-    "N",
-    "M",
-    "backspace",
-    "space",
+    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+    ["A", "S", "D", "F", "G", "H", "J", "K", "L", "⌫"],
+    ["Z", "X", "C", "V", "B", "N", "M", "space"],
   ],
   abc: [
-    "A",
-    "B",
-    "C",
-    "D",
-    "E",
-    "F",
-    "G",
-    "H",
-    "I",
-    "J",
-    "K",
-    "L",
-    "M",
-    "N",
-    "O",
-    "P",
-    "Q",
-    "R",
-    "S",
-    "T",
-    "U",
-    "V",
-    "W",
-    "X",
-    "Y",
-    "Z",
-    "backspace",
-    "space",
+    ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+    ["K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"],
+    ["U", "V", "W", "X", "Y", "Z", "⌫", "space"],
   ],
 };
 
@@ -163,7 +113,7 @@ const VirtualKeyboard: React.FC = () => {
           keySound.play();
         }
 
-        if (key === "backspace") {
+        if (key === "⌫" || key === "backspace") {
           setInput((prev) => prev.slice(0, -1));
         } else if (key === "space") {
           setInput((prev) => prev + " ");
@@ -183,48 +133,8 @@ const VirtualKeyboard: React.FC = () => {
 
   const calculateLayout = useCallback(() => {
     if (!containerRef.current) return [];
-
-    const containerWidth = containerRef.current.offsetWidth - 32;
-    const containerHeight = containerRef.current.offsetHeight - 32;
-    const spacing = settings.spacing;
-    const currentKeys = LAYOUTS[settings.layout];
-
-    // Calcular tamaño base de teclas según el espacio disponible
-    const keySize = Math.min(
-      containerWidth / 7, // Aproximadamente 7 teclas por fila
-      containerHeight / 4 // 4 filas aproximadamente
-    );
-
-    // Distribuir teclas dinámicamente
-    let currentRow: string[] = [];
-    const rows: string[][] = [];
-    let currentWidth = 0;
-
-    currentKeys.forEach((key) => {
-      const isSpecialKey = key === "space" || key === "backspace";
-      const keyWidth = isSpecialKey ? keySize * 2 : keySize;
-
-      if (currentWidth + keyWidth + spacing > containerWidth) {
-        rows.push([...currentRow]);
-        currentRow = [];
-        currentWidth = 0;
-      }
-
-      currentRow.push(key);
-      currentWidth += keyWidth + spacing;
-    });
-
-    if (currentRow.length > 0) {
-      rows.push(currentRow);
-    }
-
-    return rows;
-  }, [
-    containerRef.current?.offsetWidth,
-    containerRef.current?.offsetHeight,
-    settings.spacing,
-    settings.layout,
-  ]);
+    return LAYOUTS[settings.layout];
+  }, [settings.layout]);
 
   const [layout, setLayout] = useState<string[][]>([]);
 
@@ -241,14 +151,14 @@ const VirtualKeyboard: React.FC = () => {
   const calculateBaseKeySize = useCallback(() => {
     if (!containerRef.current) return 60;
 
-    const containerWidth = containerRef.current.offsetWidth - 32;
+    const containerWidth = containerRef.current.offsetWidth - 16; // 16 = px-2 * 2
     const maxKeysInRow = 10; // QWERTYUIOP
-    const minSpacing = 2;
+    const totalGaps = maxKeysInRow - 1;
+    const gapSize = 4; // gap-1 = 4px
 
-    const baseSize =
-      (containerWidth - minSpacing * (maxKeysInRow - 1)) / maxKeysInRow;
-    const minSize = Math.max(45, containerWidth / 20);
-    const maxSize = Math.min(120, containerWidth / 6);
+    const baseSize = (containerWidth - totalGaps * gapSize) / maxKeysInRow;
+    const minSize = Math.max(40, containerWidth / 20);
+    const maxSize = Math.min(100, containerWidth / 6);
 
     return Math.min(Math.max(baseSize, minSize), maxSize);
   }, [containerRef.current?.offsetWidth]);
@@ -352,7 +262,7 @@ const VirtualKeyboard: React.FC = () => {
             <input
               type="range"
               min="0.5"
-              max="3"
+              max="5"
               step="0.25"
               value={settings.fontSize}
               onChange={(e) =>
@@ -518,7 +428,7 @@ const VirtualKeyboard: React.FC = () => {
       >
         <div
           ref={containerRef}
-          className="virtual-keyboard w-full mx-auto p-4 pb-20"
+          className="virtual-keyboard w-full mx-auto px-2 pb-20"
           onTouchStart={(e) => {
             const key = findClosestKey(
               e.touches[0].clientX,
@@ -548,13 +458,13 @@ const VirtualKeyboard: React.FC = () => {
           {layout.map((row, rowIndex) => (
             <div
               key={rowIndex}
-              className="flex flex-wrap gap-2 justify-center mb-2"
+              className="flex flex-nowrap gap-1 justify-center mb-1"
             >
               {row.map((key) => {
                 const keySize = getKeySize();
-                const isSpaceKey = key.toLowerCase() === "space";
-                const isBackspaceKey = key.toLowerCase() === "backspace";
-                const width = isSpaceKey ? keySize * 4 : keySize;
+                const isSpaceKey = key === "space";
+                const isBackspaceKey = key === "⌫";
+                const width = isSpaceKey ? keySize * 3 : keySize;
 
                 return (
                   <button
@@ -579,9 +489,10 @@ const VirtualKeyboard: React.FC = () => {
                       width: `${width}px`,
                       height: `${keySize}px`,
                       fontSize: `${settings.fontSize}em`,
+                      minWidth: `${keySize}px`,
                     }}
                   >
-                    {isBackspaceKey ? "⌫" : isSpaceKey ? "Espacio" : key}
+                    {isSpaceKey ? "Espacio" : key}
                   </button>
                 );
               })}
