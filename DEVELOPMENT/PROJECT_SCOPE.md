@@ -6,18 +6,24 @@
 - Soporte para diferentes tamaños de pantalla
 - Interfaz intuitiva y personalizable
 - Experiencia táctil optimizada
+- Visualización en tiempo real del texto
 
 ## Características Clave
 
 - Distribución QWERTY y ABC
-- Tamaño de teclas ajustable (250% - 1000%)
-- Tamaño de texto variable (100% - 1000%)
+- Tamaño de teclas ajustable (100% - 600%)
+- Tamaño de texto variable:
+  - Teclado (50% - 500%)
+  - Área de texto (50% - 300%)
 - Temas: claro, oscuro y alto contraste
 - Modo de barrido para accesibilidad
 - Sonido de teclas configurable
 - Área de texto ocultable
 - Scroll independiente para teclado
 - Detección de teclas por proximidad
+- Display de texto en tiempo real
+- Distribución uniforme en cuadrícula
+- Espacio adaptativo
 
 ## Limitaciones Actuales
 
@@ -43,6 +49,8 @@
 - Diseño responsive y adaptable
 - Optimizado para dispositivos táctiles
 - Manejo avanzado de eventos táctiles
+- Cálculo dinámico de layouts
+- Sistema de teclas especiales unificado
 
 ## Tecnologías
 
@@ -58,6 +66,7 @@
 3. Facilidad de uso
 4. Rendimiento
 5. Experiencia táctil
+6. Consistencia visual
 
 ## Development Guidelines
 
@@ -67,5 +76,7 @@
 - Keep components modular and reusable
 - Document all major changes
 - Test en dispositivos táctiles reales
+- Mantener cuadrícula uniforme
+- Optimizar cálculos de layout
 
 ## File Structure

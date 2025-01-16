@@ -133,28 +133,85 @@ const VirtualKeyboard: React.FC = () => {
     setPredictions(predictWords(input));
   }, [input]);
 
+  const calculateBaseKeySize = useCallback(() => {
+    if (!containerRef.current) return 60;
+
+    const containerWidth = containerRef.current.offsetWidth - 16; // 16 = px-2 * 2
+    const maxKeysPerRow = 6; // Reducido de 10 a 6 para teclas más grandes
+    const totalGaps = maxKeysPerRow - 1;
+    const gapSize = 4; // gap-1 = 4px
+
+    const baseSize = (containerWidth - totalGaps * gapSize) / maxKeysPerRow;
+    const minSize = Math.max(40, containerWidth / 20);
+    const maxSize = Math.min(100, containerWidth / 4); // Aumentado de /6 a /4
+
+    return Math.min(Math.max(baseSize, minSize), maxSize);
+  }, [containerRef.current?.offsetWidth]);
+
+  const getKeySize = useCallback(() => {
+    const baseSize = calculateBaseKeySize();
+    const userSizeMultiplier = settings.keySize / 3.5;
+    return baseSize * userSizeMultiplier;
+  }, [calculateBaseKeySize, settings.keySize]);
+
   const calculateLayout = useCallback(() => {
     if (!containerRef.current) return [];
     const rows = LAYOUTS[settings.layout];
+    const containerWidth = containerRef.current.offsetWidth - 16; // 16 = px-2 * 2
+    const keySize = getKeySize();
+    const gapSize = 4; // gap-1 = 4px
 
-    // Calcular el número de teclas en la última fila sin contar el espacio
-    const lastRowKeysWithoutSpace = rows[rows.length - 1].filter(
-      (k) => k !== "␣"
-    ).length;
-    const maxKeysPerRow = Math.max(...rows.map((row) => row.length));
+    // Calcular cuántas teclas caben por fila
+    const keysPerRow = Math.floor(
+      (containerWidth + gapSize) / (keySize + gapSize)
+    );
 
-    // Calcular cuántos espacios necesitamos añadir
-    const spacesToAdd = maxKeysPerRow - lastRowKeysWithoutSpace - 1; // -1 por el espacio existente
+    // Redistribuir las teclas en más filas si es necesario
+    const newLayout: string[][] = [];
+    let currentRow: string[] = [];
 
-    // Crear una nueva última fila con los espacios distribuidos
-    const modifiedLastRow = [...rows[rows.length - 1]];
-    const spaceIndex = modifiedLastRow.indexOf("␣");
-    if (spaceIndex !== -1) {
-      modifiedLastRow[spaceIndex] = "␣".repeat(spacesToAdd + 1);
+    // Procesar todas las filas excepto la última
+    rows.slice(0, -1).forEach((row) => {
+      row.forEach((key) => {
+        if (currentRow.length >= keysPerRow) {
+          newLayout.push([...currentRow]);
+          currentRow = [];
+        }
+        currentRow.push(key);
+      });
+      if (currentRow.length > 0) {
+        newLayout.push([...currentRow]);
+        currentRow = [];
+      }
+    });
+
+    // Procesar la última fila (con la tecla de espacio)
+    const lastRow = rows[rows.length - 1];
+    const spaceKey = lastRow.find((k) => k === "␣");
+    const otherKeys = lastRow.filter((k) => k !== "␣");
+
+    // Añadir las teclas normales de la última fila
+    otherKeys.forEach((key) => {
+      if (currentRow.length >= keysPerRow) {
+        newLayout.push([...currentRow]);
+        currentRow = [];
+      }
+      currentRow.push(key);
+    });
+
+    // Si hay teclas pendientes, añadirlas
+    if (currentRow.length > 0) {
+      newLayout.push([...currentRow]);
     }
 
-    return [...rows.slice(0, -1), modifiedLastRow];
-  }, [settings.layout]);
+    // Añadir la tecla de espacio en una nueva fila
+    if (spaceKey) {
+      const spaceRow = [spaceKey];
+      newLayout.push(spaceRow);
+    }
+
+    return newLayout;
+  }, [settings.layout, getKeySize]);
 
   const [layout, setLayout] = useState<string[][]>([]);
 
@@ -167,27 +224,6 @@ const VirtualKeyboard: React.FC = () => {
     window.addEventListener("resize", updateLayout);
     return () => window.removeEventListener("resize", updateLayout);
   }, [calculateLayout]);
-
-  const calculateBaseKeySize = useCallback(() => {
-    if (!containerRef.current) return 60;
-
-    const containerWidth = containerRef.current.offsetWidth - 16; // 16 = px-2 * 2
-    const maxKeysInRow = 10; // QWERTYUIOP
-    const totalGaps = maxKeysInRow - 1;
-    const gapSize = 4; // gap-1 = 4px
-
-    const baseSize = (containerWidth - totalGaps * gapSize) / maxKeysInRow;
-    const minSize = Math.max(40, containerWidth / 20);
-    const maxSize = Math.min(100, containerWidth / 6);
-
-    return Math.min(Math.max(baseSize, minSize), maxSize);
-  }, [containerRef.current?.offsetWidth]);
-
-  const getKeySize = useCallback(() => {
-    const baseSize = calculateBaseKeySize();
-    const userSizeMultiplier = settings.keySize / 3.5;
-    return baseSize * userSizeMultiplier;
-  }, [calculateBaseKeySize, settings.keySize]);
 
   const findClosestKey = (x: number, y: number) => {
     if (!containerRef.current) return null;
