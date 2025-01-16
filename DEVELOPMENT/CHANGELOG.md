@@ -15,6 +15,10 @@
   - Selector de layout
 - Configuración para despliegue en Vercel
 - Soporte para acceso web público
+- Botón para mostrar/ocultar área de texto
+- Área de texto desplegable (0-60vh)
+- Scroll independiente para el teclado
+- Detección mejorada de teclas al deslizar
 
 ### Changed
 
@@ -25,6 +29,10 @@
 - Mejorado el contraste en modo oscuro
 - Ajustados los colores del área de texto para mejor visibilidad
 - Aumentado el tamaño máximo de teclas hasta 1000%
+- Reorganizada la interfaz para mejor usabilidad
+- Mejorado el sistema de scroll vertical
+- Optimizado el manejo táctil en toda el área
+- Barra superior más compacta y funcional
 
 ### Fixed
 
@@ -34,3 +42,10 @@
 - Aumentado el rango de tamaño de teclas (max: 6.0)
 - Aumentado el rango de tamaño de fuente (max: 3em)
 - Optimizados los cálculos de tamaño base para mejor escalabilidad
+- Problemas de scroll en el área del teclado
+- Solapamiento entre texto y teclado
+- Interacción táctil en áreas sin teclas
+
+### Removed
+
+- Predicción de palabras (temporalmente)

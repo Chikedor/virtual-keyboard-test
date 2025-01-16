@@ -109,6 +109,7 @@ const VirtualKeyboard: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const keyTimers = useRef<{ [key: string]: KeyTimer }>({});
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showTextArea, setShowTextArea] = useState(false);
 
   // Prevent scrolling when touching keyboard
   useEffect(() => {
@@ -283,7 +284,7 @@ const VirtualKeyboard: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen relative overflow-x-hidden ${
+      className={`min-h-screen relative ${
         settings.theme === "dark"
           ? "bg-gray-900 text-gray-100"
           : settings.theme === "high-contrast"
@@ -291,262 +292,65 @@ const VirtualKeyboard: React.FC = () => {
           : "bg-gray-100 text-gray-900"
       }`}
     >
-      {/* Settings Drawer */}
-      <div
-        className={`fixed top-0 right-0 h-full w-80 transform transition-transform duration-300 z-50 ${
-          showSettings ? "translate-x-0" : "translate-x-full"
-        } ${
-          settings.theme === "dark"
-            ? "bg-gray-800 text-gray-100"
-            : settings.theme === "high-contrast"
-            ? "bg-black text-yellow-300"
-            : "bg-white text-gray-900"
-        }`}
-      >
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2
-              className={`text-xl font-bold ${
-                settings.theme === "dark"
-                  ? "text-gray-100"
-                  : settings.theme === "high-contrast"
-                  ? "text-yellow-300"
-                  : "text-gray-900"
-              }`}
-            >
-              Configuración
-            </h2>
+      {/* Barra superior fija */}
+      <div className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg">
+        <div className="flex justify-between items-center p-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">Teclado Accesible</h1>
             <button
-              onClick={() => setShowSettings(false)}
-              className={`p-2 rounded-full ${
+              onClick={() => setShowTextArea(!showTextArea)}
+              className={`px-3 py-1 rounded-lg transition-colors ${
                 settings.theme === "dark"
-                  ? "hover:bg-gray-700 text-gray-300"
+                  ? "bg-gray-700 hover:bg-gray-600"
                   : settings.theme === "high-contrast"
-                  ? "hover:bg-yellow-900 text-yellow-300"
-                  : "hover:bg-gray-100 text-gray-600"
+                  ? "bg-yellow-300 hover:bg-yellow-400 text-black"
+                  : "bg-white hover:bg-gray-100"
               }`}
             >
-              <X className="w-6 h-6" />
+              {showTextArea ? "Ocultar Texto" : "Mostrar Texto"}
             </button>
           </div>
-
-          <div className="space-y-6">
-            <div>
-              <label
-                className={`block text-sm font-medium mb-2 ${
-                  settings.theme === "dark"
-                    ? "text-gray-200"
-                    : settings.theme === "high-contrast"
-                    ? "text-yellow-300"
-                    : "text-gray-700"
-                }`}
-              >
-                Tiempo de pulsación (segundos): {settings.holdTime.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0.1"
-                max="2"
-                step="0.05"
-                value={settings.holdTime}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    holdTime: parseFloat(e.target.value),
-                  }))
+          <div className="flex gap-4">
+            {settings.soundEnabled ? (
+              <Volume2
+                className="w-6 h-6 cursor-pointer"
+                onClick={() =>
+                  setSettings((s) => ({ ...s, soundEnabled: false }))
                 }
-                className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
-                  settings.theme === "dark"
-                    ? "bg-gray-700"
-                    : settings.theme === "high-contrast"
-                    ? "bg-yellow-900"
-                    : "bg-gray-200"
-                }`}
               />
-            </div>
-
-            <div>
-              <label
-                className={`block text-sm font-medium mb-2 ${
-                  settings.theme === "dark"
-                    ? "text-gray-200"
-                    : settings.theme === "high-contrast"
-                    ? "text-yellow-300"
-                    : "text-gray-700"
-                }`}
-              >
-                Tamaño de teclas: {((settings.keySize / 3.5) * 350).toFixed(0)}%
-              </label>
-              <input
-                type="range"
-                min="2.5"
-                max="35.0"
-                step="0.1"
-                value={settings.keySize}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    keySize: parseFloat(e.target.value),
-                  }))
+            ) : (
+              <VolumeX
+                className="w-6 h-6 cursor-pointer"
+                onClick={() =>
+                  setSettings((s) => ({ ...s, soundEnabled: true }))
                 }
-                className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
-                  settings.theme === "dark"
-                    ? "bg-gray-700"
-                    : settings.theme === "high-contrast"
-                    ? "bg-yellow-900"
-                    : "bg-gray-200"
-                }`}
               />
-            </div>
-
-            <div>
-              <label
-                className={`block text-sm font-medium mb-2 ${
-                  settings.theme === "dark"
-                    ? "text-gray-200"
-                    : settings.theme === "high-contrast"
-                    ? "text-yellow-300"
-                    : "text-gray-700"
-                }`}
-              >
-                Tamaño del texto: {(settings.fontSize * 100).toFixed(0)}%
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                step="0.05"
-                value={settings.fontSize}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    fontSize: parseFloat(e.target.value),
-                  }))
-                }
-                className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
-                  settings.theme === "dark"
-                    ? "bg-gray-700"
-                    : settings.theme === "high-contrast"
-                    ? "bg-yellow-900"
-                    : "bg-gray-200"
-                }`}
+            )}
+            {settings.theme === "light" ? (
+              <Moon
+                className="w-6 h-6 cursor-pointer"
+                onClick={() => setSettings((s) => ({ ...s, theme: "dark" }))}
               />
-            </div>
-
-            <div>
-              <label
-                className={`block text-sm font-medium mb-2 ${
-                  settings.theme === "dark"
-                    ? "text-gray-200"
-                    : settings.theme === "high-contrast"
-                    ? "text-yellow-300"
-                    : "text-gray-700"
-                }`}
-              >
-                Modo de barrido
-              </label>
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={settings.scanningEnabled}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      scanningEnabled: e.target.checked,
-                    }))
-                  }
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="ml-2 text-sm text-gray-600">
-                  Activar modo de barrido
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label
-                className={`block text-sm font-medium mb-2 ${
-                  settings.theme === "dark"
-                    ? "text-gray-200"
-                    : settings.theme === "high-contrast"
-                    ? "text-yellow-300"
-                    : "text-gray-700"
-                }`}
-              >
-                Distribución del teclado
-              </label>
-              <div className="flex gap-4">
-                <button
-                  onClick={() =>
-                    setSettings((s) => ({ ...s, layout: "qwerty" }))
-                  }
-                  className={`px-4 py-2 rounded-lg ${
-                    settings.layout === "qwerty"
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-700"
-                  }`}
-                >
-                  QWERTY
-                </button>
-                <button
-                  onClick={() => setSettings((s) => ({ ...s, layout: "abc" }))}
-                  className={`px-4 py-2 rounded-lg ${
-                    settings.layout === "abc"
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-700"
-                  }`}
-                >
-                  ABC
-                </button>
-              </div>
-            </div>
+            ) : (
+              <Sun
+                className="w-6 h-6 cursor-pointer"
+                onClick={() => setSettings((s) => ({ ...s, theme: "light" }))}
+              />
+            )}
+            <Settings
+              className="w-6 h-6 cursor-pointer"
+              onClick={() => setShowSettings(true)}
+            />
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="p-4 pb-20 min-h-screen">
-        {/* Header y área de texto fija */}
-        <div className="fixed top-0 left-0 right-0 bg-inherit z-10 p-4 shadow-lg max-h-[30vh] overflow-y-auto">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">Teclado Accesible</h1>
-            <div className="flex gap-4">
-              {settings.soundEnabled ? (
-                <Volume2
-                  className="w-6 h-6 cursor-pointer"
-                  onClick={() =>
-                    setSettings((s) => ({ ...s, soundEnabled: false }))
-                  }
-                />
-              ) : (
-                <VolumeX
-                  className="w-6 h-6 cursor-pointer"
-                  onClick={() =>
-                    setSettings((s) => ({ ...s, soundEnabled: true }))
-                  }
-                />
-              )}
-              {settings.theme === "light" ? (
-                <Moon
-                  className="w-6 h-6 cursor-pointer"
-                  onClick={() => setSettings((s) => ({ ...s, theme: "dark" }))}
-                />
-              ) : (
-                <Sun
-                  className="w-6 h-6 cursor-pointer"
-                  onClick={() => setSettings((s) => ({ ...s, theme: "light" }))}
-                />
-              )}
-              <Settings
-                className="w-6 h-6 cursor-pointer"
-                onClick={() => setShowSettings(true)}
-              />
-            </div>
-          </div>
-
-          {/* Input Area */}
-          <div className="mb-2">
+        {/* Área de texto desplegable */}
+        <div
+          className={`transition-all duration-300 overflow-hidden ${
+            showTextArea ? "max-h-[60vh]" : "max-h-0"
+          }`}
+        >
+          <div className="p-4">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -558,19 +362,24 @@ const VirtualKeyboard: React.FC = () => {
                   : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring focus:ring-blue-200"
               }`}
               style={{
-                height: "100px",
-                maxHeight: "20vh",
+                height: "40vh",
                 resize: "none",
                 fontSize: `${settings.fontSize}em`,
               }}
             />
           </div>
         </div>
+      </div>
 
-        {/* Espacio para el contenido fijo - ajustado */}
-        <div className="h-[30vh]"></div>
+      {/* Espacio para la barra superior */}
+      <div
+        className={`${
+          showTextArea ? "h-[calc(40vh+4rem)]" : "h-16"
+        } transition-all duration-300`}
+      ></div>
 
-        {/* Virtual Keyboard - Área interactiva */}
+      {/* Área del teclado con scroll independiente */}
+      <div className="fixed top-[calc(40vh+4rem)] bottom-0 left-0 right-0 overflow-y-auto bg-inherit">
         <div
           ref={containerRef}
           className="virtual-keyboard w-full mx-auto p-4 pb-20"
