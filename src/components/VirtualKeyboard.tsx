@@ -507,7 +507,7 @@ const VirtualKeyboard: React.FC = () => {
       {/* Main Content */}
       <div className="p-4 pb-20 min-h-screen">
         {/* Header y área de texto fija */}
-        <div className="fixed top-0 left-0 right-0 bg-inherit z-10 p-4 shadow-lg">
+        <div className="fixed top-0 left-0 right-0 bg-inherit z-10 p-4 shadow-lg max-h-[30vh] overflow-y-auto">
           {/* Header */}
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">Teclado Accesible</h1>
@@ -546,7 +546,7 @@ const VirtualKeyboard: React.FC = () => {
           </div>
 
           {/* Input Area */}
-          <div className="mb-6">
+          <div className="mb-2">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -558,42 +558,22 @@ const VirtualKeyboard: React.FC = () => {
                   : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring focus:ring-blue-200"
               }`}
               style={{
-                minHeight: "100px",
+                height: "100px",
+                maxHeight: "20vh",
+                resize: "none",
                 fontSize: `${settings.fontSize}em`,
               }}
             />
-            <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-              {predictions.map((word, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    const words = input.split(" ");
-                    words.pop();
-                    setInput([...words, word].join(" ") + " ");
-                  }}
-                  className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
-                    settings.theme === "dark"
-                      ? "bg-blue-900 text-blue-100 hover:bg-blue-800"
-                      : settings.theme === "high-contrast"
-                      ? "bg-yellow-300 text-black hover:bg-yellow-400"
-                      : "bg-blue-100 text-blue-800 hover:bg-blue-200"
-                  }`}
-                  style={{ fontSize: `${settings.fontSize}em` }}
-                >
-                  {word}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
-        {/* Espacio para el contenido fijo */}
-        <div className="h-[calc(220px+4rem)]"></div>
+        {/* Espacio para el contenido fijo - ajustado */}
+        <div className="h-[30vh]"></div>
 
         {/* Virtual Keyboard - Área interactiva */}
         <div
           ref={containerRef}
-          className="virtual-keyboard w-full mx-auto p-4"
+          className="virtual-keyboard w-full mx-auto p-4 pb-20"
           onTouchStart={(e) => {
             const key = findClosestKey(
               e.touches[0].clientX,
