@@ -228,6 +228,9 @@ const VirtualKeyboard: React.FC = () => {
       className={`fixed inset-0 bg-black bg-opacity-50 z-30 ${
         showSettings ? "flex" : "hidden"
       } items-center justify-center p-4`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
     >
       <div
         className={`relative w-full max-w-md p-6 rounded-xl shadow-lg ${
@@ -237,18 +240,29 @@ const VirtualKeyboard: React.FC = () => {
             ? "bg-black border-2 border-yellow-300"
             : "bg-white"
         }`}
+        role="document"
       >
         <button
           onClick={() => setShowSettings(false)}
           className="absolute top-4 right-4"
+          aria-label="Cerrar configuración"
         >
           <X className="w-6 h-6" />
         </button>
-        <h2 className="text-xl font-bold mb-4">Configuración</h2>
+        <h2
+          id="settings-title"
+          className="text-xl font-bold mb-4"
+          role="heading"
+          aria-level={2}
+        >
+          Configuración
+        </h2>
 
         <div className="space-y-4">
           <div>
-            <label className="block mb-2">Tiempo de pulsación (segundos)</label>
+            <label className="block mb-2" id="hold-time-label">
+              Tiempo de pulsación (segundos)
+            </label>
             <input
               type="range"
               min="0.1"
@@ -262,12 +276,20 @@ const VirtualKeyboard: React.FC = () => {
                 }))
               }
               className="w-full"
+              aria-labelledby="hold-time-label"
+              aria-valuemin={0.1}
+              aria-valuemax={2}
+              aria-valuenow={settings.holdTime}
             />
-            <span className="text-sm">{settings.holdTime}s</span>
+            <span className="text-sm" aria-hidden="true">
+              {settings.holdTime}s
+            </span>
           </div>
 
           <div>
-            <label className="block mb-2">Número de filas</label>
+            <label className="block mb-2" id="rows-label">
+              Número de filas
+            </label>
             <input
               type="range"
               min="2"
@@ -281,12 +303,18 @@ const VirtualKeyboard: React.FC = () => {
                 }))
               }
               className="w-full"
+              aria-labelledby="rows-label"
+              aria-valuemin={2}
+              aria-valuemax={12}
+              aria-valuenow={settings.numRows}
             />
-            <span className="text-sm">{settings.numRows} filas</span>
+            <span className="text-sm" aria-hidden="true">
+              {settings.numRows} filas
+            </span>
           </div>
 
           <div>
-            <label className="block mb-2">
+            <label className="block mb-2" id="font-size-label">
               Tamaño de texto del teclado (%)
             </label>
             <input
@@ -302,8 +330,12 @@ const VirtualKeyboard: React.FC = () => {
                 }))
               }
               className="w-full"
+              aria-labelledby="font-size-label"
+              aria-valuemin={0.5}
+              aria-valuemax={40}
+              aria-valuenow={settings.fontSize}
             />
-            <span className="text-sm">
+            <span className="text-sm" aria-hidden="true">
               {Math.round(settings.fontSize * 100)}%
             </span>
           </div>
@@ -370,6 +402,17 @@ const VirtualKeyboard: React.FC = () => {
     </div>
   );
 
+  const getKeyAriaLabel = (key: string) => {
+    switch (key) {
+      case "␣":
+        return "Tecla espacio";
+      case "⌫":
+        return "Tecla borrar";
+      default:
+        return `Tecla ${key}`;
+    }
+  };
+
   return (
     <div
       className={`min-h-screen relative ${
@@ -379,12 +422,19 @@ const VirtualKeyboard: React.FC = () => {
           ? "bg-black text-yellow-300"
           : "bg-gray-100 text-gray-900"
       }`}
+      role="application"
+      aria-label="Teclado Virtual Accesible"
     >
       {/* Barra superior fija */}
-      <div className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg">
+      <div
+        className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg"
+        role="banner"
+      >
         <div className="flex justify-between items-center p-4">
           <div className="flex items-center gap-4 flex-1">
-            <h1 className="text-2xl font-bold">Teclado Accesible</h1>
+            <h1 className="text-2xl font-bold" role="heading" aria-level={1}>
+              Teclado Accesible
+            </h1>
             <button
               onClick={() => setShowTextArea(!showTextArea)}
               className={`px-3 py-1 rounded-lg transition-colors ${
@@ -394,6 +444,8 @@ const VirtualKeyboard: React.FC = () => {
                   ? "bg-yellow-300 hover:bg-yellow-400 text-black"
                   : "bg-white hover:bg-gray-100"
               }`}
+              aria-pressed={showTextArea}
+              aria-controls="text-area"
             >
               {showTextArea ? "Ocultar Texto" : "Mostrar Texto"}
             </button>
@@ -405,54 +457,82 @@ const VirtualKeyboard: React.FC = () => {
                   ? "bg-black border border-yellow-300"
                   : "bg-gray-200"
               }`}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              aria-label="Texto escrito"
             >
               {input}
             </div>
           </div>
-          <div className="flex gap-4 ml-4">
-            {settings.soundEnabled ? (
-              <Volume2
-                className="w-6 h-6 cursor-pointer"
-                onClick={() =>
-                  setSettings((s) => ({ ...s, soundEnabled: false }))
-                }
-              />
-            ) : (
-              <VolumeX
-                className="w-6 h-6 cursor-pointer"
-                onClick={() =>
-                  setSettings((s) => ({ ...s, soundEnabled: true }))
-                }
-              />
-            )}
-            {settings.theme === "light" ? (
-              <Moon
-                className="w-6 h-6 cursor-pointer"
-                onClick={() => setSettings((s) => ({ ...s, theme: "dark" }))}
-              />
-            ) : (
-              <Sun
-                className="w-6 h-6 cursor-pointer"
-                onClick={() => setSettings((s) => ({ ...s, theme: "light" }))}
-              />
-            )}
-            <Settings
-              className="w-6 h-6 cursor-pointer"
+          <div
+            className="flex gap-4 ml-4"
+            role="toolbar"
+            aria-label="Controles rápidos"
+          >
+            <button
+              onClick={() =>
+                setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
+              }
+              aria-pressed={settings.soundEnabled}
+              aria-label={
+                settings.soundEnabled ? "Desactivar sonido" : "Activar sonido"
+              }
+            >
+              {settings.soundEnabled ? (
+                <Volume2 className="w-6 h-6 cursor-pointer" />
+              ) : (
+                <VolumeX className="w-6 h-6 cursor-pointer" />
+              )}
+            </button>
+            <button
+              onClick={() =>
+                setSettings((s) => ({
+                  ...s,
+                  theme: s.theme === "light" ? "dark" : "light",
+                }))
+              }
+              aria-pressed={settings.theme === "dark"}
+              aria-label={
+                settings.theme === "light"
+                  ? "Cambiar a tema oscuro"
+                  : "Cambiar a tema claro"
+              }
+            >
+              {settings.theme === "light" ? (
+                <Moon className="w-6 h-6 cursor-pointer" />
+              ) : (
+                <Sun className="w-6 h-6 cursor-pointer" />
+              )}
+            </button>
+            <button
               onClick={() => setShowSettings(true)}
-            />
+              aria-expanded={showSettings}
+              aria-haspopup="dialog"
+              aria-label="Abrir configuración"
+            >
+              <Settings className="w-6 h-6 cursor-pointer" />
+            </button>
           </div>
         </div>
 
         {/* Área de texto desplegable */}
         <div
+          id="text-area"
           className={`transition-all duration-300 overflow-hidden ${
             showTextArea ? "max-h-[60vh]" : "max-h-0"
           }`}
+          role="region"
+          aria-label="Área de texto"
+          aria-expanded={showTextArea}
         >
           <div className="p-4">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              aria-label="Área de texto para escribir"
+              aria-describedby="text-area-description"
+              role="textbox"
               className={`w-full p-4 rounded-lg border-2 transition-all ${
                 settings.theme === "dark"
                   ? "bg-gray-800 border-gray-600 text-gray-100 focus:border-blue-400 focus:ring focus:ring-blue-400/20"
@@ -466,6 +546,10 @@ const VirtualKeyboard: React.FC = () => {
                 fontSize: `${settings.textareaFontSize}em`,
               }}
             />
+            <div id="text-area-description" className="sr-only">
+              Área de texto donde aparecerá lo que escribas usando el teclado
+              virtual
+            </div>
           </div>
         </div>
       </div>
@@ -487,10 +571,14 @@ const VirtualKeyboard: React.FC = () => {
           top: showTextArea ? "calc(40vh + 4rem)" : "4rem",
           transition: "top 300ms ease-in-out",
         }}
+        role="group"
+        aria-label="Teclado virtual"
       >
         <div
           ref={containerRef}
           className="virtual-keyboard w-full mx-auto px-2 pb-20"
+          role="application"
+          aria-label="Teclas del teclado"
           onTouchStart={(e) => {
             const key = findClosestKey(
               e.touches[0].clientX,
@@ -543,6 +631,12 @@ const VirtualKeyboard: React.FC = () => {
                 return (
                   <button
                     key={key}
+                    role="button"
+                    aria-label={getKeyAriaLabel(key)}
+                    aria-pressed={
+                      activeKey ===
+                      (isSpaceKey || isBackspaceKey ? key : key.toLowerCase())
+                    }
                     onMouseDown={() => {
                       const processedKey =
                         isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
