@@ -24,11 +24,30 @@
 - Espacio adaptativo en última fila
 - Documentación completa en inglés (README.md)
 - Sistema de redistribución de teclas en múltiples filas
+- Atributos ARIA completos para accesibilidad
+  - `role="application"` para el teclado
+  - `role="banner"` para la barra superior
+  - `role="dialog"` para configuración
+  - `role="toolbar"` para controles rápidos
+  - `role="region"` para área de texto
+  - Etiquetas y descripciones ARIA para todos los elementos
+  - Estados y propiedades ARIA para interactividad
+  - Roles semánticos para mejor navegación
 
 ### Changed
 
 - Refactorización del sistema de layouts para mayor flexibilidad
 - Mejora en el cálculo de tamaños de teclas
+  - Cambio de porcentaje a número de filas (2-12)
+  - Cálculo automático del tamaño basado en espacio disponible
+  - Mejor distribución de teclas especiales
+- Aumento de límites de tamaño de texto
+  - Teclado: hasta 4000% (40em)
+  - Área de texto: hasta 1500% (15em)
+- Mejora en el cálculo de layout
+  - Distribución uniforme en filas
+  - Adaptación automática al número de filas
+  - Mejor manejo de teclas especiales
 - Aumentado el tamaño máximo del texto hasta 500%
 - Simplificada la interfaz mostrando tamaños en porcentajes
 - Mejorado el contraste en modo oscuro
@@ -59,8 +78,19 @@
 - Distribución responsiva del teclado
 - Cálculo del espacio en última fila
 - Problemas con teclas grandes generando scroll horizontal
+- Corrección en el cálculo de tamaño de teclas
+- Mejora en la distribución de teclas por fila
+- Optimización del espacio disponible
 
 ### Removed
 
 - Predicción de palabras (temporalmente)
 - Límite de ancho máximo en teclas grandes
+
+### Improved
+
+- Accesibilidad general del teclado
+- Adaptabilidad a diferentes tamaños de pantalla
+- Experiencia de usuario para personas con discapacidad visual
+
+## [0.1.0] - 2024-01-16

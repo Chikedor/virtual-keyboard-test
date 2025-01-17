@@ -10,7 +10,6 @@ interface KeyboardSettings {
   holdTime: number;
   soundEnabled: boolean;
   theme: "light" | "dark" | "high-contrast";
-  scanningEnabled: boolean;
   numRows: number;
   fontSize: number;
   textareaFontSize: number;
@@ -49,7 +48,6 @@ const VirtualKeyboard: React.FC = () => {
     holdTime: 0.2,
     soundEnabled: true,
     theme: "light",
-    scanningEnabled: false,
     numRows: 3,
     fontSize: 1.25,
     textareaFontSize: 1.25,
