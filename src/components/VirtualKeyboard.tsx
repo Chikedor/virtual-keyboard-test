@@ -19,7 +19,7 @@ interface KeyboardSettings {
 
 // Configuración por defecto
 const DEFAULT_SETTINGS: KeyboardSettings = {
-  holdTime: 0.2,
+  holdTime: 0.1,
   soundEnabled: true,
   theme: "light",
   numRows: 3,
@@ -283,7 +283,7 @@ const VirtualKeyboard: React.FC = () => {
             <input
               type="range"
               min="0.1"
-              max="2"
+              max="1.0"
               step="0.1"
               value={settings.holdTime}
               onChange={(e) =>
@@ -295,7 +295,7 @@ const VirtualKeyboard: React.FC = () => {
               className="w-full"
               aria-labelledby="hold-time-label"
               aria-valuemin={0.1}
-              aria-valuemax={2}
+              aria-valuemax={1.0}
               aria-valuenow={settings.holdTime}
             />
             <span className="text-sm" aria-hidden="true">
