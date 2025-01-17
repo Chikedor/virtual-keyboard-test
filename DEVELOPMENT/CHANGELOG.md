@@ -38,6 +38,7 @@
 - Optimización del manejo táctil con sistema de caché
 - Soporte para hasta 26 filas (1 letra por fila)
 - Reducción del tiempo de pulsación por defecto a 0.1s
+- Prevención de selección de texto en todo el teclado
 
 ### Changed
 
@@ -47,8 +48,8 @@
   - Cálculo automático del tamaño basado en espacio disponible
   - Mejor distribución de teclas especiales
 - Aumento de límites de tamaño de texto
-  - Teclado: hasta 4000% (40em)
-  - Área de texto: hasta 1500% (15em)
+  - Teclado: hasta 80em
+  - Área de texto: hasta 15em
 - Mejora en el cálculo de layout
   - Distribución uniforme en filas
   - Adaptación automática al número de filas
@@ -71,6 +72,7 @@
 - Mejorada la eficiencia de detección de teclas táctiles
 - Ajustado el rango del slider de tiempo de pulsación (0.1s - 1.0s)
 - Eliminada la configuración no utilizada de scanningEnabled
+- Mejorado el centrado de texto en las teclas
 
 ### Fixed
 
@@ -89,22 +91,27 @@
 - Corrección en el cálculo de tamaño de teclas
 - Mejora en la distribución de teclas por fila
 - Optimización del espacio disponible
+- Problemas con el scroll táctil
+- Centrado vertical y horizontal del texto en las teclas
 
 ### Removed
 
 - Predicción de palabras (temporalmente)
 - Límite de ancho máximo en teclas grandes
+- preventDefault global para mejorar el scroll
 
 ### Improved
 
 - Accesibilidad general del teclado
 - Adaptabilidad a diferentes tamaños de pantalla
 - Experiencia de usuario para personas con discapacidad visual
+- Manejo de eventos táctiles y scroll
 
 ### Optimized
 
 - Implementado sistema de caché para posiciones de teclas
 - Búsqueda optimizada con radio de proximidad
 - Actualización automática del layout con ResizeObserver
+- Detección de intención de scroll vs interacción con teclas
 
 ## [0.1.0] - 2024-01-16

@@ -170,17 +170,6 @@ const VirtualKeyboard: React.FC = () => {
     saveSettings(settings);
   }, [settings]);
 
-  // Prevent scrolling when touching keyboard
-  useEffect(() => {
-    const preventDefault = (e: TouchEvent) => {
-      if ((e.target as HTMLElement).closest(".virtual-keyboard")) {
-        e.preventDefault();
-      }
-    };
-    document.addEventListener("touchmove", preventDefault, { passive: false });
-    return () => document.removeEventListener("touchmove", preventDefault);
-  }, []);
-
   const predictWords = (text: string) => {
     const commonWords = [
       "the",
@@ -415,7 +404,7 @@ const VirtualKeyboard: React.FC = () => {
             <input
               type="range"
               min="0.5"
-              max="40"
+              max="80"
               step="0.5"
               value={settings.fontSize}
               onChange={(e) =>
@@ -427,7 +416,7 @@ const VirtualKeyboard: React.FC = () => {
               className="w-full"
               aria-labelledby="font-size-label"
               aria-valuemin={0.5}
-              aria-valuemax={40}
+              aria-valuemax={80}
               aria-valuenow={settings.fontSize}
             />
             <span className="text-sm" aria-hidden="true">
@@ -670,7 +659,7 @@ const VirtualKeyboard: React.FC = () => {
 
       {/* Área del teclado con scroll independiente */}
       <div
-        className="fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit"
+        className="fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit select-none"
         style={{
           top: showTextArea ? "calc(40vh + 4rem)" : "4rem",
           transition: "top 300ms ease-in-out",
@@ -680,39 +669,56 @@ const VirtualKeyboard: React.FC = () => {
       >
         <div
           ref={containerRef}
-          className="virtual-keyboard w-full mx-auto px-2 pb-20"
+          className="virtual-keyboard w-full mx-auto px-2 pb-20 select-none"
           role="application"
           aria-label="Teclas del teclado"
           onTouchStart={(e) => {
-            const key = findClosestKey(
-              e.touches[0].clientX,
-              e.touches[0].clientY
-            );
-            if (key) {
-              const isSpecial = key === "⌫" || key === "␣";
-              handleKeyDown(isSpecial ? key : key.toLowerCase());
+            if ((e.target as HTMLElement).tagName === "BUTTON") {
+              e.preventDefault();
+              const key = findClosestKey(
+                e.touches[0].clientX,
+                e.touches[0].clientY
+              );
+              if (key) {
+                const isSpecial = key === "⌫" || key === "␣";
+                handleKeyDown(isSpecial ? key : key.toLowerCase());
+              }
             }
           }}
           onTouchEnd={(e) => {
-            const key = findClosestKey(
-              e.changedTouches[0].clientX,
-              e.changedTouches[0].clientY
-            );
-            if (key) {
-              const isSpecial = key === "⌫" || key === "␣";
-              handleKeyUp(isSpecial ? key : key.toLowerCase());
+            if ((e.target as HTMLElement).tagName === "BUTTON") {
+              e.preventDefault();
+              const key = findClosestKey(
+                e.changedTouches[0].clientX,
+                e.changedTouches[0].clientY
+              );
+              if (key) {
+                const isSpecial = key === "⌫" || key === "␣";
+                handleKeyUp(isSpecial ? key : key.toLowerCase());
+              }
             }
           }}
           onTouchMove={(e) => {
-            e.preventDefault();
-            const key = findClosestKey(
-              e.touches[0].clientX,
-              e.touches[0].clientY
-            );
-            if (key && key !== activeKey) {
-              if (activeKey) handleKeyUp(activeKey);
-              const isSpecial = key === "⌫" || key === "␣";
-              handleKeyDown(isSpecial ? key : key.toLowerCase());
+            const target = e.target as HTMLElement;
+            // Solo procesar el movimiento si estamos sobre un botón
+            if (target.tagName === "BUTTON") {
+              const touchStartY = e.touches[0].clientY;
+              const touchCurrentY = e.touches[0].clientY;
+              const deltaY = Math.abs(touchCurrentY - touchStartY);
+
+              // Si el movimiento vertical es pequeño, asumimos que es interacción con tecla
+              if (deltaY < 10) {
+                e.preventDefault();
+                const key = findClosestKey(
+                  e.touches[0].clientX,
+                  e.touches[0].clientY
+                );
+                if (key && key !== activeKey) {
+                  if (activeKey) handleKeyUp(activeKey);
+                  const isSpecial = key === "⌫" || key === "␣";
+                  handleKeyDown(isSpecial ? key : key.toLowerCase());
+                }
+              }
             }
           }}
         >
@@ -776,9 +782,9 @@ const VirtualKeyboard: React.FC = () => {
                       }
                       ${getThemeClasses(settings.theme)}
                       shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
-                      flex items-center justify-center touch-manipulation
+                      flex items-center justify-center touch-manipulation select-none
                       ${isSpaceKey ? "text-2xl" : ""}
-                      overflow-hidden
+                      overflow-hidden text-center
                     `}
                     style={{
                       width: keyWidth,
@@ -786,11 +792,13 @@ const VirtualKeyboard: React.FC = () => {
                       height: isLastRow ? `${calculateKeySize()}px` : "auto",
                       fontSize: isSpaceKey ? "1.5em" : `${settings.fontSize}em`,
                       margin: "0 2px",
-                      padding: "0.25em",
+                      padding: "0",
                       lineHeight: "1",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
+                      textAlign: "center",
+                      verticalAlign: "middle",
                     }}
                   >
                     {key}
