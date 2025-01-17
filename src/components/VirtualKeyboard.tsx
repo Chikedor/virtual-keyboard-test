@@ -75,6 +75,96 @@ const VirtualKeyboard: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showTextArea, setShowTextArea] = useState(false);
 
+  // Caché de posiciones de teclas
+  const keyPositionsRef = useRef<{
+    positions: Array<{
+      key: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }>;
+    lastUpdate: number;
+  }>({ positions: [], lastUpdate: 0 });
+
+  // Actualizar caché de posiciones
+  const updateKeyPositions = useCallback(() => {
+    if (!containerRef.current) return;
+
+    const buttons = containerRef.current.getElementsByTagName("button");
+    const positions = [];
+
+    for (const button of buttons) {
+      const rect = button.getBoundingClientRect();
+      positions.push({
+        key: button.textContent || "",
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        width: rect.width,
+        height: rect.height,
+      });
+    }
+
+    keyPositionsRef.current = {
+      positions,
+      lastUpdate: Date.now(),
+    };
+  }, []);
+
+  // Actualizar posiciones cuando cambie el layout
+  useEffect(() => {
+    updateKeyPositions();
+    const observer = new ResizeObserver(updateKeyPositions);
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+    return () => observer.disconnect();
+  }, [settings.numRows, settings.layout]);
+
+  const findClosestKey = useCallback((x: number, y: number) => {
+    const { positions, lastUpdate } = keyPositionsRef.current;
+
+    // Si el caché tiene más de 1 segundo, actualizarlo
+    if (Date.now() - lastUpdate > 1000) {
+      updateKeyPositions();
+    }
+
+    let closest = null;
+    let minDistance = Infinity;
+
+    // Optimización: primero buscar en un radio razonable
+    const searchRadius = 100; // píxeles
+
+    for (const pos of positions) {
+      const dx = x - pos.x;
+      const dy = y - pos.y;
+
+      // Si está dentro del radio de búsqueda
+      if (Math.abs(dx) <= searchRadius && Math.abs(dy) <= searchRadius) {
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closest = pos.key;
+        }
+      }
+    }
+
+    // Si no encontramos nada en el radio, buscar en todas las teclas
+    if (!closest) {
+      for (const pos of positions) {
+        const dx = x - pos.x;
+        const dy = y - pos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closest = pos.key;
+        }
+      }
+    }
+
+    return closest;
+  }, []);
+
   // Guardar configuraciones cuando cambien
   useEffect(() => {
     saveSettings(settings);
@@ -216,27 +306,15 @@ const VirtualKeyboard: React.FC = () => {
     return () => window.removeEventListener("resize", updateLayout);
   }, [calculateLayout]);
 
-  const findClosestKey = (x: number, y: number) => {
-    if (!containerRef.current) return null;
-    const elements = containerRef.current.getElementsByTagName("button");
-    let closest = null;
-    let minDistance = Infinity;
-
-    for (const element of elements) {
-      const rect = element.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const distance = Math.sqrt(
-        Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
-      );
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        closest = element.textContent;
-      }
+  const getKeyAriaLabel = (key: string) => {
+    switch (key) {
+      case "␣":
+        return "Tecla espacio";
+      case "⌫":
+        return "Tecla borrar";
+      default:
+        return `Tecla ${key}`;
     }
-
-    return closest;
   };
 
   // Componente de Settings
@@ -438,17 +516,6 @@ const VirtualKeyboard: React.FC = () => {
       </div>
     </div>
   );
-
-  const getKeyAriaLabel = (key: string) => {
-    switch (key) {
-      case "␣":
-        return "Tecla espacio";
-      case "⌫":
-        return "Tecla borrar";
-      default:
-        return `Tecla ${key}`;
-    }
-  };
 
   return (
     <div

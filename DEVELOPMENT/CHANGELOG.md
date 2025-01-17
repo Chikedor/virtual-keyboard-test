@@ -33,6 +33,11 @@
   - Etiquetas y descripciones ARIA para todos los elementos
   - Estados y propiedades ARIA para interactividad
   - Roles semánticos para mejor navegación
+- Local storage para persistencia de configuraciones de usuario
+- Botón de reset para restaurar configuraciones por defecto
+- Optimización del manejo táctil con sistema de caché
+- Soporte para hasta 26 filas (1 letra por fila)
+- Reducción del tiempo de pulsación por defecto a 0.1s
 
 ### Changed
 
@@ -63,6 +68,9 @@
 - Modificado el sistema de layout para evitar scroll horizontal
 - Reducido el número máximo de teclas por fila de 10 a 6
 - Aumentado el tamaño base de las teclas
+- Mejorada la eficiencia de detección de teclas táctiles
+- Ajustado el rango del slider de tiempo de pulsación (0.1s - 1.0s)
+- Eliminada la configuración no utilizada de scanningEnabled
 
 ### Fixed
 
@@ -92,5 +100,11 @@
 - Accesibilidad general del teclado
 - Adaptabilidad a diferentes tamaños de pantalla
 - Experiencia de usuario para personas con discapacidad visual
+
+### Optimized
+
+- Implementado sistema de caché para posiciones de teclas
+- Búsqueda optimizada con radio de proximidad
+- Actualización automática del layout con ResizeObserver
 
 ## [0.1.0] - 2024-01-16
