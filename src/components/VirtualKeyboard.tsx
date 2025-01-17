@@ -309,8 +309,8 @@ const VirtualKeyboard: React.FC = () => {
             </label>
             <input
               type="range"
-              min="2"
-              max="12"
+              min="1"
+              max="26"
               step="1"
               value={settings.numRows}
               onChange={(e) =>
@@ -321,8 +321,8 @@ const VirtualKeyboard: React.FC = () => {
               }
               className="w-full"
               aria-labelledby="rows-label"
-              aria-valuemin={2}
-              aria-valuemax={12}
+              aria-valuemin={1}
+              aria-valuemax={26}
               aria-valuenow={settings.numRows}
             />
             <span className="text-sm" aria-hidden="true">
