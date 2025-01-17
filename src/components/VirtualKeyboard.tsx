@@ -17,6 +17,29 @@ interface KeyboardSettings {
   layout: "qwerty" | "abc";
 }
 
+// Configuración por defecto
+const DEFAULT_SETTINGS: KeyboardSettings = {
+  holdTime: 0.2,
+  soundEnabled: true,
+  theme: "light",
+  numRows: 3,
+  fontSize: 1.25,
+  textareaFontSize: 1.25,
+  spacing: 2,
+  layout: "qwerty",
+};
+
+const loadSettings = (): KeyboardSettings => {
+  const saved = localStorage.getItem("keyboardSettings");
+  return saved
+    ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
+    : DEFAULT_SETTINGS;
+};
+
+const saveSettings = (settings: KeyboardSettings): void => {
+  localStorage.setItem("keyboardSettings", JSON.stringify(settings));
+};
+
 // Definir las teclas en ambos órdenes
 const LAYOUTS = {
   qwerty: [
@@ -44,22 +67,18 @@ const getThemeClasses = (theme: string) => {
 
 const VirtualKeyboard: React.FC = () => {
   const [input, setInput] = useState("");
-  const [settings, setSettings] = useState<KeyboardSettings>({
-    holdTime: 0.2,
-    soundEnabled: true,
-    theme: "light",
-    numRows: 3,
-    fontSize: 1.25,
-    textareaFontSize: 1.25,
-    spacing: 2,
-    layout: "qwerty",
-  });
+  const [settings, setSettings] = useState<KeyboardSettings>(loadSettings());
   const [predictions, setPredictions] = useState<string[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const keyTimers = useRef<{ [key: string]: KeyTimer }>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const [showTextArea, setShowTextArea] = useState(false);
+
+  // Guardar configuraciones cuando cambien
+  useEffect(() => {
+    saveSettings(settings);
+  }, [settings]);
 
   // Prevent scrolling when touching keyboard
   useEffect(() => {
@@ -393,6 +412,26 @@ const VirtualKeyboard: React.FC = () => {
               }`}
             >
               {settings.soundEnabled ? "Activado" : "Desactivado"}
+            </button>
+          </div>
+
+          {/* Botón de Reset */}
+          <div className="mt-6 pt-4 border-t">
+            <button
+              onClick={() => {
+                setSettings(DEFAULT_SETTINGS);
+                localStorage.removeItem("keyboardSettings");
+              }}
+              className={`w-full px-4 py-2 rounded ${
+                settings.theme === "dark"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : settings.theme === "high-contrast"
+                  ? "bg-red-500 text-black hover:bg-red-600"
+                  : "bg-red-500 hover:bg-red-600"
+              } text-white font-semibold transition-colors`}
+              aria-label="Restablecer configuración por defecto"
+            >
+              Restablecer Configuración
             </button>
           </div>
         </div>
