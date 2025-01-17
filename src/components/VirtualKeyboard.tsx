@@ -11,7 +11,7 @@ interface KeyboardSettings {
   soundEnabled: boolean;
   theme: "light" | "dark" | "high-contrast";
   scanningEnabled: boolean;
-  keySize: number;
+  numRows: number;
   fontSize: number;
   textareaFontSize: number;
   spacing: number;
@@ -50,7 +50,7 @@ const VirtualKeyboard: React.FC = () => {
     soundEnabled: true,
     theme: "light",
     scanningEnabled: false,
-    keySize: 3.5,
+    numRows: 3,
     fontSize: 1.25,
     textareaFontSize: 1.25,
     spacing: 2,
@@ -133,85 +133,59 @@ const VirtualKeyboard: React.FC = () => {
     setPredictions(predictWords(input));
   }, [input]);
 
-  const calculateBaseKeySize = useCallback(() => {
+  const calculateKeySize = useCallback(() => {
     if (!containerRef.current) return 60;
 
-    const containerWidth = containerRef.current.offsetWidth - 16; // 16 = px-2 * 2
-    const maxKeysPerRow = 6; // Reducido de 10 a 6 para teclas más grandes
-    const totalGaps = maxKeysPerRow - 1;
-    const gapSize = 4; // gap-1 = 4px
+    const containerWidth = containerRef.current.offsetWidth - 32;
+    const containerHeight = window.innerHeight - (showTextArea ? 40 : 0) - 80;
+    const totalRows = settings.numRows + 1;
 
-    const baseSize = (containerWidth - totalGaps * gapSize) / maxKeysPerRow;
-    const minSize = Math.max(40, containerWidth / 20);
-    const maxSize = Math.min(100, containerWidth / 4); // Aumentado de /6 a /4
+    const heightPerRow = containerHeight / totalRows;
+    const maxKeysInRow = Math.ceil(26 / settings.numRows);
+    const widthPerKey = containerWidth / maxKeysInRow;
 
-    return Math.min(Math.max(baseSize, minSize), maxSize);
-  }, [containerRef.current?.offsetWidth]);
-
-  const getKeySize = useCallback(() => {
-    const baseSize = calculateBaseKeySize();
-    const userSizeMultiplier = settings.keySize / 3.5;
-    return baseSize * userSizeMultiplier;
-  }, [calculateBaseKeySize, settings.keySize]);
+    return Math.min(heightPerRow, widthPerKey) * 0.9;
+  }, [containerRef.current?.offsetWidth, showTextArea, settings.numRows]);
 
   const calculateLayout = useCallback(() => {
     if (!containerRef.current) return [];
-    const rows = LAYOUTS[settings.layout];
-    const containerWidth = containerRef.current.offsetWidth - 16; // 16 = px-2 * 2
-    const keySize = getKeySize();
-    const gapSize = 4; // gap-1 = 4px
+    const allKeys = LAYOUTS[settings.layout].flat();
 
-    // Calcular cuántas teclas caben por fila
-    const keysPerRow = Math.floor(
-      (containerWidth + gapSize) / (keySize + gapSize)
-    );
+    // Separar teclas especiales
+    const spaceKey = allKeys.find((k) => k === "␣");
+    const backspaceKey = allKeys.find((k) => k === "⌫");
+    const regularKeys = allKeys.filter((k) => k !== "␣" && k !== "⌫");
 
-    // Redistribuir las teclas en más filas si es necesario
+    // Calcular teclas por fila basado en el número de filas deseado
+    const totalRegularKeys = regularKeys.length;
+    const keysPerRow = Math.ceil(totalRegularKeys / settings.numRows);
+
+    // Distribuir teclas regulares en filas
     const newLayout: string[][] = [];
-    let currentRow: string[] = [];
-
-    // Procesar todas las filas excepto la última
-    rows.slice(0, -1).forEach((row) => {
-      row.forEach((key) => {
-        if (currentRow.length >= keysPerRow) {
-          newLayout.push([...currentRow]);
-          currentRow = [];
-        }
-        currentRow.push(key);
-      });
-      if (currentRow.length > 0) {
-        newLayout.push([...currentRow]);
-        currentRow = [];
-      }
-    });
-
-    // Procesar la última fila (con la tecla de espacio)
-    const lastRow = rows[rows.length - 1];
-    const spaceKey = lastRow.find((k) => k === "␣");
-    const otherKeys = lastRow.filter((k) => k !== "␣");
-
-    // Añadir las teclas normales de la última fila
-    otherKeys.forEach((key) => {
-      if (currentRow.length >= keysPerRow) {
-        newLayout.push([...currentRow]);
-        currentRow = [];
-      }
-      currentRow.push(key);
-    });
-
-    // Si hay teclas pendientes, añadirlas
-    if (currentRow.length > 0) {
-      newLayout.push([...currentRow]);
+    for (let i = 0; i < regularKeys.length; i += keysPerRow) {
+      const row = regularKeys.slice(i, i + keysPerRow);
+      newLayout.push(row);
     }
 
-    // Añadir la tecla de espacio en una nueva fila
+    // Manejar última fila
+    const lastRow = newLayout[newLayout.length - 1];
+    if (lastRow && lastRow.length < keysPerRow) {
+      // Si la última fila no está completa, añadir backspace
+      if (backspaceKey) {
+        lastRow.push(backspaceKey);
+      }
+    } else if (backspaceKey) {
+      // Si la última fila está completa, crear nueva fila para backspace
+      newLayout.push([backspaceKey]);
+    }
+
+    // Añadir barra espaciadora en su propia fila
     if (spaceKey) {
-      const spaceRow = [spaceKey];
-      newLayout.push(spaceRow);
+      newLayout.push([spaceKey]);
     }
 
     return newLayout;
-  }, [settings.layout, getKeySize]);
+  }, [settings.layout, settings.numRows]);
 
   const [layout, setLayout] = useState<string[][]>([]);
 
@@ -293,24 +267,22 @@ const VirtualKeyboard: React.FC = () => {
           </div>
 
           <div>
-            <label className="block mb-2">Tamaño de teclas (%)</label>
+            <label className="block mb-2">Número de filas</label>
             <input
               type="range"
-              min="1"
-              max="6"
-              step="0.5"
-              value={settings.keySize}
+              min="2"
+              max="12"
+              step="1"
+              value={settings.numRows}
               onChange={(e) =>
                 setSettings((s) => ({
                   ...s,
-                  keySize: parseFloat(e.target.value),
+                  numRows: parseInt(e.target.value),
                 }))
               }
               className="w-full"
             />
-            <span className="text-sm">
-              {Math.round((settings.keySize * 100) / 3.5)}%
-            </span>
+            <span className="text-sm">{settings.numRows} filas</span>
           </div>
 
           <div>
@@ -320,8 +292,8 @@ const VirtualKeyboard: React.FC = () => {
             <input
               type="range"
               min="0.5"
-              max="5"
-              step="0.25"
+              max="40"
+              step="0.5"
               value={settings.fontSize}
               onChange={(e) =>
                 setSettings((s) => ({
@@ -341,7 +313,7 @@ const VirtualKeyboard: React.FC = () => {
             <input
               type="range"
               min="0.5"
-              max="3"
+              max="15"
               step="0.25"
               value={settings.textareaFontSize}
               onChange={(e) =>
@@ -556,13 +528,17 @@ const VirtualKeyboard: React.FC = () => {
             <div
               key={rowIndex}
               className="flex justify-between gap-1 px-2 mb-1"
+              style={{
+                width: "100%",
+              }}
             >
               {row.map((key) => {
-                const keySize = getKeySize();
-                const isSpaceKey = key.includes("␣");
+                const isSpaceKey = key === "␣";
                 const isBackspaceKey = key === "⌫";
-                const spaceMultiplier = isSpaceKey ? key.length : 1;
-                const width = keySize * spaceMultiplier;
+                const isLastRow = rowIndex === layout.length - 1;
+                const keyWidth = isLastRow
+                  ? `${100 / row.length}%`
+                  : `${100 / row.length}%`;
 
                 return (
                   <button
@@ -604,12 +580,19 @@ const VirtualKeyboard: React.FC = () => {
                       shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
                       flex items-center justify-center touch-manipulation
                       ${isSpaceKey ? "text-2xl" : ""}
+                      overflow-hidden
                     `}
                     style={{
-                      width: `${width}px`,
-                      height: `${keySize}px`,
+                      width: keyWidth,
+                      aspectRatio: isLastRow ? "auto" : "1",
+                      height: isLastRow ? `${calculateKeySize()}px` : "auto",
                       fontSize: isSpaceKey ? "1.5em" : `${settings.fontSize}em`,
-                      minWidth: `${keySize}px`,
+                      margin: "0 2px",
+                      padding: "0.25em",
+                      lineHeight: "1",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
                     {key}
