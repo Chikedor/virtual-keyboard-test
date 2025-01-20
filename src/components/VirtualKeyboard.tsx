@@ -570,16 +570,14 @@ const VirtualKeyboard: React.FC = () => {
   };
 
   const keyClasses = `
-    flex items-center justify-center
+    relative
     w-full h-full
     rounded-lg
     transition-colors
     ${getThemeClasses(settings.theme)}
-    text-center
-    p-2
     select-none
     touch-none
-    ${settings.fontSize ? `text-[${settings.fontSize}rem]` : "text-xl"}
+    overflow-hidden
   `;
 
   const handleSavePreset = (name: string) => {
@@ -634,7 +632,22 @@ const VirtualKeyboard: React.FC = () => {
                 Teclado Accesible
               </h1>
               <button
-                onClick={() => setShowTextArea(!showTextArea)}
+                onClick={() => {
+                  setShowTextArea(!showTextArea);
+                  if (!showTextArea) {
+                    // Si estamos mostrando el área de texto, inicializar la altura
+                    setTimeout(() => {
+                      const textarea = document.querySelector("textarea");
+                      if (textarea) {
+                        const height = textarea.scrollHeight;
+                        document.documentElement.style.setProperty(
+                          "--text-area-height",
+                          `${height + 32}px`
+                        );
+                      }
+                    }, 0);
+                  }
+                }}
                 className={`px-3 py-1 rounded-lg transition-colors ${
                   settings.theme === "dark"
                     ? "bg-gray-700 hover:bg-gray-600"
@@ -661,8 +674,16 @@ const VirtualKeyboard: React.FC = () => {
                 aria-live="polite"
                 aria-atomic="true"
                 aria-label="Texto escrito"
+                style={{
+                  minWidth: "50px",
+                  maxWidth: "calc(100% - 300px)",
+                  width: "fit-content",
+                  minHeight: "2.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                }}
               >
-                {input}
+                <span className="inline-block min-w-[1ch]">{input || " "}</span>
               </div>
             </div>
             <div
@@ -733,7 +754,7 @@ const VirtualKeyboard: React.FC = () => {
                 aria-label="Área de texto para escribir"
                 aria-describedby="text-area-description"
                 role="textbox"
-                className={`w-full p-4 rounded-lg border-2 transition-all ${
+                className={`w-full p-2 rounded-lg border-2 transition-all ${
                   settings.theme === "dark"
                     ? "bg-gray-800 border-gray-600 text-gray-100 focus:border-blue-400 focus:ring focus:ring-blue-400/20"
                     : settings.theme === "high-contrast"
@@ -741,9 +762,31 @@ const VirtualKeyboard: React.FC = () => {
                     : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring focus:ring-blue-200"
                 }`}
                 style={{
-                  height: "40vh",
+                  minHeight: `${Math.max(1, settings.textareaFontSize)}em`,
+                  maxHeight: "20vh",
+                  height: "auto",
                   resize: "none",
                   fontSize: `${settings.textareaFontSize}em`,
+                  overflow: "hidden",
+                  lineHeight: "1.2",
+                  padding: `${Math.max(
+                    0.25,
+                    settings.textareaFontSize * 0.15
+                  )}em`,
+                }}
+                onInput={(e) => {
+                  const textarea = e.currentTarget;
+                  textarea.style.height = "auto";
+                  const newHeight = Math.min(
+                    textarea.scrollHeight,
+                    window.innerHeight * 0.2
+                  );
+                  textarea.style.height = `${newHeight}px`;
+                  // Actualizar la variable CSS para el espacio reservado
+                  document.documentElement.style.setProperty(
+                    "--text-area-height",
+                    `${newHeight + 32}px`
+                  );
                 }}
               />
               <div id="text-area-description" className="sr-only">
@@ -759,7 +802,9 @@ const VirtualKeyboard: React.FC = () => {
         {/* Espacio para la barra superior y área de texto */}
         <div
           style={{
-            height: showTextArea ? "calc(40vh + 4rem)" : "4rem",
+            height: showTextArea
+              ? "calc(4rem + var(--text-area-height, 0px))"
+              : "4rem",
             transition: "height 300ms ease-in-out",
           }}
         />
@@ -768,7 +813,9 @@ const VirtualKeyboard: React.FC = () => {
         <div
           className="fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit select-none"
           style={{
-            top: showTextArea ? "calc(40vh + 4rem)" : "4rem",
+            top: showTextArea
+              ? "calc(4rem + var(--text-area-height, 0px))"
+              : "4rem",
             transition: "top 300ms ease-in-out",
           }}
           role="group"
@@ -901,28 +948,28 @@ const VirtualKeyboard: React.FC = () => {
                         }
                         ${keyClasses}
                         shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
-                        flex items-center justify-center touch-manipulation select-none
-                        ${isSpaceKey ? "text-2xl" : ""}
-                        overflow-hidden text-center
+                        touch-manipulation
                       `}
                       style={{
                         width: keyWidth,
                         aspectRatio: isLastRow ? "auto" : "1",
                         height: isLastRow ? `${calculateKeySize()}px` : "auto",
-                        fontSize: isSpaceKey
-                          ? "1.5em"
-                          : `${settings.fontSize}em`,
                         margin: "0 2px",
                         padding: "0",
-                        lineHeight: "1",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        textAlign: "center",
-                        verticalAlign: "middle",
+                        minHeight: "44px",
                       }}
                     >
-                      {key}
+                      <div
+                        className="absolute inset-0 flex items-center justify-center"
+                        style={{
+                          fontSize: isSpaceKey
+                            ? "1.5em"
+                            : `${settings.fontSize}em`,
+                          lineHeight: "1",
+                        }}
+                      >
+                        {key}
+                      </div>
                     </button>
                   );
                 })}
