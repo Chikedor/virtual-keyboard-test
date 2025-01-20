@@ -90,7 +90,6 @@ const VirtualKeyboard: React.FC = () => {
   const [input, setInput] = useState("");
   const [settings, setSettings] = useState<KeyboardSettings>(loadSettings());
   const [presets, setPresets] = useState<Preset[]>(loadPresets());
-  const [predictions, setPredictions] = useState<string[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
@@ -193,22 +192,6 @@ const VirtualKeyboard: React.FC = () => {
     saveSettings(settings);
   }, [settings]);
 
-  const predictWords = (text: string) => {
-    const commonWords = [
-      "the",
-      "be",
-      "to",
-      "of",
-      "and",
-      "that",
-      "have",
-      "with",
-    ];
-    return commonWords.filter((word) =>
-      word.startsWith(text.split(" ").pop() || "")
-    );
-  };
-
   const handleKeyDown = useCallback((key: string) => {
     if (keyTimers.current[key]?.timeout) return;
 
@@ -251,10 +234,6 @@ const VirtualKeyboard: React.FC = () => {
     },
     [settings.holdTime, settings.soundEnabled]
   );
-
-  useEffect(() => {
-    setPredictions(predictWords(input));
-  }, [input]);
 
   const calculateKeySize = useCallback(() => {
     if (!containerRef.current) return 60;
@@ -619,311 +598,340 @@ const VirtualKeyboard: React.FC = () => {
   };
 
   return (
-    <div
-      className={`min-h-screen relative ${
-        settings.theme === "dark"
-          ? "bg-gray-900 text-gray-100"
-          : settings.theme === "high-contrast"
-          ? "bg-black text-yellow-300"
-          : "bg-gray-100 text-gray-900"
-      }`}
-      role="application"
-      aria-label="Teclado Virtual Accesible"
-    >
-      {/* Barra superior fija */}
+    <>
+      {/* Capa de flash */}
       <div
-        className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg"
-        role="banner"
-      >
-        <div className="flex justify-between items-center p-4">
-          <div className="flex items-center gap-4 flex-1">
-            <h1 className="text-2xl font-bold" role="heading" aria-level={1}>
-              Teclado Accesible
-            </h1>
-            <button
-              onClick={() => setShowTextArea(!showTextArea)}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                settings.theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : settings.theme === "high-contrast"
-                  ? "bg-yellow-300 hover:bg-yellow-400 text-black"
-                  : "bg-white hover:bg-gray-100"
-              }`}
-              aria-pressed={showTextArea}
-              aria-controls="text-area"
-            >
-              {showTextArea ? "Ocultar Texto" : "Mostrar Texto"}
-            </button>
-            <div
-              className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap transition-colors duration-150 ${
-                settings.theme === "dark"
-                  ? `bg-gray-800 ${isFlashing ? "bg-gray-600" : ""}`
-                  : settings.theme === "high-contrast"
-                  ? `bg-black border border-yellow-300 ${
-                      isFlashing ? "bg-yellow-900" : ""
-                    }`
-                  : `bg-gray-200 ${isFlashing ? "bg-gray-300" : ""}`
-              }`}
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              aria-label="Texto escrito"
-            >
-              {input}
-            </div>
-          </div>
-          <div
-            className="flex gap-4 ml-4"
-            role="toolbar"
-            aria-label="Controles rápidos"
-          >
-            <button
-              onClick={() =>
-                setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
-              }
-              aria-pressed={settings.soundEnabled}
-              aria-label={
-                settings.soundEnabled ? "Desactivar sonido" : "Activar sonido"
-              }
-            >
-              {settings.soundEnabled ? (
-                <Volume2 className="w-6 h-6 cursor-pointer" />
-              ) : (
-                <VolumeX className="w-6 h-6 cursor-pointer" />
-              )}
-            </button>
-            <button
-              onClick={() =>
-                setSettings((s) => ({
-                  ...s,
-                  theme: s.theme === "light" ? "dark" : "light",
-                }))
-              }
-              aria-pressed={settings.theme === "dark"}
-              aria-label={
-                settings.theme === "light"
-                  ? "Cambiar a tema oscuro"
-                  : "Cambiar a tema claro"
-              }
-            >
-              {settings.theme === "light" ? (
-                <Moon className="w-6 h-6 cursor-pointer" />
-              ) : (
-                <Sun className="w-6 h-6 cursor-pointer" />
-              )}
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              aria-expanded={showSettings}
-              aria-haspopup="dialog"
-              aria-label="Abrir configuración"
-            >
-              <Settings className="w-6 h-6 cursor-pointer" />
-            </button>
-          </div>
-        </div>
-
-        {/* Área de texto desplegable */}
-        <div
-          id="text-area"
-          className={`transition-all duration-300 overflow-hidden ${
-            showTextArea ? "max-h-[60vh]" : "max-h-0"
-          }`}
-          role="region"
-          aria-label="Área de texto"
-          aria-expanded={showTextArea}
-        >
-          <div className="p-4">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              aria-label="Área de texto para escribir"
-              aria-describedby="text-area-description"
-              role="textbox"
-              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                settings.theme === "dark"
-                  ? "bg-gray-800 border-gray-600 text-gray-100 focus:border-blue-400 focus:ring focus:ring-blue-400/20"
-                  : settings.theme === "high-contrast"
-                  ? "bg-black border-yellow-300 text-yellow-300 focus:border-yellow-400 focus:ring focus:ring-yellow-400/20"
-                  : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring focus:ring-blue-200"
-              }`}
-              style={{
-                height: "40vh",
-                resize: "none",
-                fontSize: `${settings.textareaFontSize}em`,
-              }}
-            />
-            <div id="text-area-description" className="sr-only">
-              Área de texto donde aparecerá lo que escribas usando el teclado
-              virtual
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <SettingsPanel />
-
-      {/* Espacio para la barra superior y área de texto */}
-      <div
-        style={{
-          height: showTextArea ? "calc(40vh + 4rem)" : "4rem",
-          transition: "height 300ms ease-in-out",
-        }}
+        className={`fixed inset-0 pointer-events-none z-50 transition-opacity duration-150 ${
+          isFlashing ? "opacity-30" : "opacity-0"
+        } ${
+          settings.theme === "dark"
+            ? "bg-gray-300"
+            : settings.theme === "high-contrast"
+            ? "bg-yellow-300"
+            : "bg-white"
+        }`}
+        aria-hidden="true"
       />
-
-      {/* Área del teclado con scroll independiente */}
       <div
-        className="fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit select-none"
-        style={{
-          top: showTextArea ? "calc(40vh + 4rem)" : "4rem",
-          transition: "top 300ms ease-in-out",
-        }}
-        role="group"
-        aria-label="Teclado virtual"
+        className={`min-h-screen relative ${
+          settings.theme === "dark"
+            ? "bg-gray-900 text-gray-100"
+            : settings.theme === "high-contrast"
+            ? "bg-black text-yellow-300"
+            : "bg-gray-100 text-gray-900"
+        }`}
+        role="application"
+        aria-label="Teclado Virtual Accesible"
       >
+        {/* Barra superior fija */}
         <div
-          ref={containerRef}
-          className="virtual-keyboard w-full mx-auto px-2 pb-20 select-none"
-          role="application"
-          aria-label="Teclas del teclado"
-          onTouchStart={(e) => {
-            if ((e.target as HTMLElement).tagName === "BUTTON") {
-              e.preventDefault();
-              const key = findClosestKey(
-                e.touches[0].clientX,
-                e.touches[0].clientY
-              );
-              if (key) {
-                const isSpecial = key === "⌫" || key === "␣";
-                handleKeyDown(isSpecial ? key : key.toLowerCase());
-              }
-            }
-          }}
-          onTouchEnd={(e) => {
-            if ((e.target as HTMLElement).tagName === "BUTTON") {
-              e.preventDefault();
-              const key = findClosestKey(
-                e.changedTouches[0].clientX,
-                e.changedTouches[0].clientY
-              );
-              if (key) {
-                const isSpecial = key === "⌫" || key === "␣";
-                handleKeyUp(isSpecial ? key : key.toLowerCase());
-              }
-            }
-          }}
-          onTouchMove={(e) => {
-            const target = e.target as HTMLElement;
-            // Solo procesar el movimiento si estamos sobre un botón
-            if (target.tagName === "BUTTON") {
-              const touchStartY = e.touches[0].clientY;
-              const touchCurrentY = e.touches[0].clientY;
-              const deltaY = Math.abs(touchCurrentY - touchStartY);
+          className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg"
+          role="banner"
+        >
+          <div className="flex justify-between items-center p-4">
+            <div className="flex items-center gap-4 flex-1">
+              <h1 className="text-2xl font-bold" role="heading" aria-level={1}>
+                Teclado Accesible
+              </h1>
+              <button
+                onClick={() => setShowTextArea(!showTextArea)}
+                className={`px-3 py-1 rounded-lg transition-colors ${
+                  settings.theme === "dark"
+                    ? "bg-gray-700 hover:bg-gray-600"
+                    : settings.theme === "high-contrast"
+                    ? "bg-yellow-300 hover:bg-yellow-400 text-black"
+                    : "bg-white hover:bg-gray-100"
+                }`}
+                aria-pressed={showTextArea}
+                aria-controls="text-area"
+              >
+                {showTextArea ? "Ocultar Texto" : "Mostrar Texto"}
+              </button>
+              <div
+                className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap transition-colors duration-150 ${
+                  settings.theme === "dark"
+                    ? `bg-gray-800 ${isFlashing ? "bg-gray-600" : ""}`
+                    : settings.theme === "high-contrast"
+                    ? `bg-black border border-yellow-300 ${
+                        isFlashing ? "bg-yellow-900" : ""
+                      }`
+                    : `bg-gray-200 ${isFlashing ? "bg-gray-300" : ""}`
+                }`}
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                aria-label="Texto escrito"
+              >
+                {input}
+              </div>
+            </div>
+            <div
+              className="flex gap-4 ml-4"
+              role="toolbar"
+              aria-label="Controles rápidos"
+            >
+              <button
+                onClick={() =>
+                  setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
+                }
+                aria-pressed={settings.soundEnabled}
+                aria-label={
+                  settings.soundEnabled ? "Desactivar sonido" : "Activar sonido"
+                }
+              >
+                {settings.soundEnabled ? (
+                  <Volume2 className="w-6 h-6 cursor-pointer" />
+                ) : (
+                  <VolumeX className="w-6 h-6 cursor-pointer" />
+                )}
+              </button>
+              <button
+                onClick={() =>
+                  setSettings((s) => ({
+                    ...s,
+                    theme: s.theme === "light" ? "dark" : "light",
+                  }))
+                }
+                aria-pressed={settings.theme === "dark"}
+                aria-label={
+                  settings.theme === "light"
+                    ? "Cambiar a tema oscuro"
+                    : "Cambiar a tema claro"
+                }
+              >
+                {settings.theme === "light" ? (
+                  <Moon className="w-6 h-6 cursor-pointer" />
+                ) : (
+                  <Sun className="w-6 h-6 cursor-pointer" />
+                )}
+              </button>
+              <button
+                onClick={() => setShowSettings(true)}
+                aria-expanded={showSettings}
+                aria-haspopup="dialog"
+                aria-label="Abrir configuración"
+              >
+                <Settings className="w-6 h-6 cursor-pointer" />
+              </button>
+            </div>
+          </div>
 
-              // Si el movimiento vertical es pequeño, asumimos que es interacción con tecla
-              if (deltaY < 10) {
+          {/* Área de texto desplegable */}
+          <div
+            id="text-area"
+            className={`transition-all duration-300 overflow-hidden ${
+              showTextArea ? "max-h-[60vh]" : "max-h-0"
+            }`}
+            role="region"
+            aria-label="Área de texto"
+            aria-expanded={showTextArea}
+          >
+            <div className="p-4">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                aria-label="Área de texto para escribir"
+                aria-describedby="text-area-description"
+                role="textbox"
+                className={`w-full p-4 rounded-lg border-2 transition-all ${
+                  settings.theme === "dark"
+                    ? "bg-gray-800 border-gray-600 text-gray-100 focus:border-blue-400 focus:ring focus:ring-blue-400/20"
+                    : settings.theme === "high-contrast"
+                    ? "bg-black border-yellow-300 text-yellow-300 focus:border-yellow-400 focus:ring focus:ring-yellow-400/20"
+                    : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                }`}
+                style={{
+                  height: "40vh",
+                  resize: "none",
+                  fontSize: `${settings.textareaFontSize}em`,
+                }}
+              />
+              <div id="text-area-description" className="sr-only">
+                Área de texto donde aparecerá lo que escribas usando el teclado
+                virtual
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <SettingsPanel />
+
+        {/* Espacio para la barra superior y área de texto */}
+        <div
+          style={{
+            height: showTextArea ? "calc(40vh + 4rem)" : "4rem",
+            transition: "height 300ms ease-in-out",
+          }}
+        />
+
+        {/* Área del teclado con scroll independiente */}
+        <div
+          className="fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit select-none"
+          style={{
+            top: showTextArea ? "calc(40vh + 4rem)" : "4rem",
+            transition: "top 300ms ease-in-out",
+          }}
+          role="group"
+          aria-label="Teclado virtual"
+        >
+          <div
+            ref={containerRef}
+            className="virtual-keyboard w-full mx-auto px-2 pb-20 select-none"
+            role="application"
+            aria-label="Teclas del teclado"
+            onTouchStart={(e) => {
+              if ((e.target as HTMLElement).tagName === "BUTTON") {
                 e.preventDefault();
                 const key = findClosestKey(
                   e.touches[0].clientX,
                   e.touches[0].clientY
                 );
-                if (key && key !== activeKey) {
-                  if (activeKey) handleKeyUp(activeKey);
+                if (key) {
                   const isSpecial = key === "⌫" || key === "␣";
                   handleKeyDown(isSpecial ? key : key.toLowerCase());
                 }
               }
-            }
-          }}
-        >
-          {layout.map((row, rowIndex) => (
-            <div
-              key={rowIndex}
-              className="flex justify-between gap-1 px-2 mb-1"
-              style={{
-                width: "100%",
-              }}
-            >
-              {row.map((key) => {
-                const isSpaceKey = key === "␣";
-                const isBackspaceKey = key === "⌫";
-                const isLastRow = rowIndex === layout.length - 1;
-                const keyWidth = isLastRow
-                  ? `${100 / row.length}%`
-                  : `${100 / row.length}%`;
+            }}
+            onTouchEnd={(e) => {
+              if ((e.target as HTMLElement).tagName === "BUTTON") {
+                e.preventDefault();
+                const key = findClosestKey(
+                  e.changedTouches[0].clientX,
+                  e.changedTouches[0].clientY
+                );
+                if (key) {
+                  const isSpecial = key === "⌫" || key === "␣";
+                  handleKeyUp(isSpecial ? key : key.toLowerCase());
+                }
+              }
+            }}
+            onTouchMove={(e) => {
+              const target = e.target as HTMLElement;
+              // Solo procesar el movimiento si estamos sobre un botón
+              if (target.tagName === "BUTTON") {
+                const touchStartY = e.touches[0].clientY;
+                const touchCurrentY = e.touches[0].clientY;
+                const deltaY = Math.abs(touchCurrentY - touchStartY);
 
-                return (
-                  <button
-                    key={key}
-                    role="button"
-                    aria-label={getKeyAriaLabel(key)}
-                    aria-pressed={
-                      activeKey ===
-                      (isSpaceKey || isBackspaceKey ? key : key.toLowerCase())
-                    }
-                    onMouseDown={() => {
-                      const processedKey =
-                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
-                      handleKeyDown(processedKey);
-                    }}
-                    onMouseUp={() => {
-                      const processedKey =
-                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
-                      handleKeyUp(processedKey);
-                    }}
-                    onMouseLeave={() => {
-                      const processedKey =
-                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
-                      handleKeyUp(processedKey);
-                    }}
-                    onTouchStart={() => {
-                      const processedKey =
-                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
-                      handleKeyDown(processedKey);
-                    }}
-                    onTouchEnd={() => {
-                      const processedKey =
-                        isSpaceKey || isBackspaceKey ? key : key.toLowerCase();
-                      handleKeyUp(processedKey);
-                    }}
-                    className={`
-                      font-semibold rounded-xl transition-all duration-200
-                      ${
+                // Si el movimiento vertical es pequeño, asumimos que es interacción con tecla
+                if (deltaY < 10) {
+                  e.preventDefault();
+                  const key = findClosestKey(
+                    e.touches[0].clientX,
+                    e.touches[0].clientY
+                  );
+                  if (key && key !== activeKey) {
+                    if (activeKey) handleKeyUp(activeKey);
+                    const isSpecial = key === "⌫" || key === "␣";
+                    handleKeyDown(isSpecial ? key : key.toLowerCase());
+                  }
+                }
+              }
+            }}
+          >
+            {layout.map((row, rowIndex) => (
+              <div
+                key={rowIndex}
+                className="flex justify-between gap-1 px-2 mb-1"
+                style={{
+                  width: "100%",
+                }}
+              >
+                {row.map((key) => {
+                  const isSpaceKey = key === "␣";
+                  const isBackspaceKey = key === "⌫";
+                  const isLastRow = rowIndex === layout.length - 1;
+                  const keyWidth = isLastRow
+                    ? `${100 / row.length}%`
+                    : `${100 / row.length}%`;
+
+                  return (
+                    <button
+                      key={key}
+                      role="button"
+                      aria-label={getKeyAriaLabel(key)}
+                      aria-pressed={
                         activeKey ===
                         (isSpaceKey || isBackspaceKey ? key : key.toLowerCase())
-                          ? "scale-95"
-                          : "scale-100"
                       }
-                      ${keyClasses}
-                      shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
-                      flex items-center justify-center touch-manipulation select-none
-                      ${isSpaceKey ? "text-2xl" : ""}
-                      overflow-hidden text-center
-                    `}
-                    style={{
-                      width: keyWidth,
-                      aspectRatio: isLastRow ? "auto" : "1",
-                      height: isLastRow ? `${calculateKeySize()}px` : "auto",
-                      fontSize: isSpaceKey ? "1.5em" : `${settings.fontSize}em`,
-                      margin: "0 2px",
-                      padding: "0",
-                      lineHeight: "1",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      verticalAlign: "middle",
-                    }}
-                  >
-                    {key}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+                      onMouseDown={() => {
+                        const processedKey =
+                          isSpaceKey || isBackspaceKey
+                            ? key
+                            : key.toLowerCase();
+                        handleKeyDown(processedKey);
+                      }}
+                      onMouseUp={() => {
+                        const processedKey =
+                          isSpaceKey || isBackspaceKey
+                            ? key
+                            : key.toLowerCase();
+                        handleKeyUp(processedKey);
+                      }}
+                      onMouseLeave={() => {
+                        const processedKey =
+                          isSpaceKey || isBackspaceKey
+                            ? key
+                            : key.toLowerCase();
+                        handleKeyUp(processedKey);
+                      }}
+                      onTouchStart={() => {
+                        const processedKey =
+                          isSpaceKey || isBackspaceKey
+                            ? key
+                            : key.toLowerCase();
+                        handleKeyDown(processedKey);
+                      }}
+                      onTouchEnd={() => {
+                        const processedKey =
+                          isSpaceKey || isBackspaceKey
+                            ? key
+                            : key.toLowerCase();
+                        handleKeyUp(processedKey);
+                      }}
+                      className={`
+                        font-semibold rounded-xl transition-all duration-200
+                        ${
+                          activeKey ===
+                          (isSpaceKey || isBackspaceKey
+                            ? key
+                            : key.toLowerCase())
+                            ? "scale-95"
+                            : "scale-100"
+                        }
+                        ${keyClasses}
+                        shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
+                        flex items-center justify-center touch-manipulation select-none
+                        ${isSpaceKey ? "text-2xl" : ""}
+                        overflow-hidden text-center
+                      `}
+                      style={{
+                        width: keyWidth,
+                        aspectRatio: isLastRow ? "auto" : "1",
+                        height: isLastRow ? `${calculateKeySize()}px` : "auto",
+                        fontSize: isSpaceKey
+                          ? "1.5em"
+                          : `${settings.fontSize}em`,
+                        margin: "0 2px",
+                        padding: "0",
+                        lineHeight: "1",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textAlign: "center",
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      {key}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
