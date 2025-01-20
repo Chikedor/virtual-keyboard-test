@@ -93,6 +93,7 @@ const VirtualKeyboard: React.FC = () => {
   const [predictions, setPredictions] = useState<string[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [isFlashing, setIsFlashing] = useState(false);
   const keyTimers = useRef<{ [key: string]: KeyTimer }>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const [showTextArea, setShowTextArea] = useState(false);
@@ -240,6 +241,10 @@ const VirtualKeyboard: React.FC = () => {
         } else {
           setInput((prev) => prev + key);
         }
+
+        // Activar el flash
+        setIsFlashing(true);
+        setTimeout(() => setIsFlashing(false), 150); // Duración del flash
       }
 
       delete keyTimers.current[key];
@@ -650,12 +655,14 @@ const VirtualKeyboard: React.FC = () => {
               {showTextArea ? "Ocultar Texto" : "Mostrar Texto"}
             </button>
             <div
-              className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap ${
+              className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap transition-colors duration-150 ${
                 settings.theme === "dark"
-                  ? "bg-gray-800"
+                  ? `bg-gray-800 ${isFlashing ? "bg-gray-600" : ""}`
                   : settings.theme === "high-contrast"
-                  ? "bg-black border border-yellow-300"
-                  : "bg-gray-200"
+                  ? `bg-black border border-yellow-300 ${
+                      isFlashing ? "bg-yellow-900" : ""
+                    }`
+                  : `bg-gray-200 ${isFlashing ? "bg-gray-300" : ""}`
               }`}
               role="status"
               aria-live="polite"
