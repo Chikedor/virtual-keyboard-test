@@ -17,6 +17,11 @@ interface KeyboardSettings {
   layout: "qwerty" | "abc";
 }
 
+interface Preset {
+  name: string;
+  settings: KeyboardSettings;
+}
+
 // Configuración por defecto
 const DEFAULT_SETTINGS: KeyboardSettings = {
   holdTime: 0.1,
@@ -38,6 +43,22 @@ const loadSettings = (): KeyboardSettings => {
 
 const saveSettings = (settings: KeyboardSettings): void => {
   localStorage.setItem("keyboardSettings", JSON.stringify(settings));
+};
+
+const loadPresets = (): Preset[] => {
+  const saved = localStorage.getItem("keyboardPresets");
+  return saved ? JSON.parse(saved) : [];
+};
+
+const savePreset = (name: string, settings: KeyboardSettings): void => {
+  const presets = loadPresets();
+  presets.push({ name, settings });
+  localStorage.setItem("keyboardPresets", JSON.stringify(presets));
+};
+
+const deletePreset = (name: string): void => {
+  const presets = loadPresets().filter((preset) => preset.name !== name);
+  localStorage.setItem("keyboardPresets", JSON.stringify(presets));
 };
 
 // Definir las teclas en ambos órdenes
@@ -68,6 +89,7 @@ const getThemeClasses = (theme: string) => {
 const VirtualKeyboard: React.FC = () => {
   const [input, setInput] = useState("");
   const [settings, setSettings] = useState<KeyboardSettings>(loadSettings());
+  const [presets, setPresets] = useState<Preset[]>(loadPresets());
   const [predictions, setPredictions] = useState<string[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -307,204 +329,289 @@ const VirtualKeyboard: React.FC = () => {
   };
 
   // Componente de Settings
-  const SettingsPanel = () => (
-    <div
-      className={`fixed inset-0 bg-black bg-opacity-50 z-30 ${
-        showSettings ? "flex" : "hidden"
-      } items-center justify-center p-4`}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-    >
+  const SettingsPanel = () => {
+    const [newPresetName, setNewPresetName] = useState("");
+
+    return (
       <div
-        className={`relative w-full max-w-md p-6 rounded-xl shadow-lg ${
-          settings.theme === "dark"
-            ? "bg-gray-800"
-            : settings.theme === "high-contrast"
-            ? "bg-black border-2 border-yellow-300"
-            : "bg-white"
-        }`}
-        role="document"
+        className={`fixed inset-0 bg-black bg-opacity-50 z-30 ${
+          showSettings ? "flex" : "hidden"
+        } items-center justify-center p-4`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
       >
-        <button
-          onClick={() => setShowSettings(false)}
-          className="absolute top-4 right-4"
-          aria-label="Cerrar configuración"
+        <div
+          className={`relative w-full max-w-md p-6 rounded-xl shadow-lg ${
+            settings.theme === "dark"
+              ? "bg-gray-800"
+              : settings.theme === "high-contrast"
+              ? "bg-black border-2 border-yellow-300"
+              : "bg-white"
+          }`}
+          role="document"
         >
-          <X className="w-6 h-6" />
-        </button>
-        <h2
-          id="settings-title"
-          className="text-xl font-bold mb-4"
-          role="heading"
-          aria-level={2}
-        >
-          Configuración
-        </h2>
+          <button
+            onClick={() => setShowSettings(false)}
+            className="absolute top-4 right-4"
+            aria-label="Cerrar configuración"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <h2
+            id="settings-title"
+            className="text-xl font-bold mb-4"
+            role="heading"
+            aria-level={2}
+          >
+            Configuración
+          </h2>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block mb-2" id="hold-time-label">
-              Tiempo de pulsación (segundos)
-            </label>
-            <input
-              type="range"
-              min="0.1"
-              max="1.0"
-              step="0.1"
-              value={settings.holdTime}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  holdTime: parseFloat(e.target.value),
-                }))
-              }
-              className="w-full"
-              aria-labelledby="hold-time-label"
-              aria-valuemin={0.1}
-              aria-valuemax={1.0}
-              aria-valuenow={settings.holdTime}
-            />
-            <span className="text-sm" aria-hidden="true">
-              {settings.holdTime}s
-            </span>
-          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-2" id="hold-time-label">
+                Tiempo de pulsación (segundos)
+              </label>
+              <input
+                type="range"
+                min="0.1"
+                max="1.0"
+                step="0.1"
+                value={settings.holdTime}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    holdTime: parseFloat(e.target.value),
+                  }))
+                }
+                className="w-full"
+                aria-labelledby="hold-time-label"
+                aria-valuemin={0.1}
+                aria-valuemax={1.0}
+                aria-valuenow={settings.holdTime}
+              />
+              <span className="text-sm" aria-hidden="true">
+                {settings.holdTime}s
+              </span>
+            </div>
 
-          <div>
-            <label className="block mb-2" id="rows-label">
-              Número de filas
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="26"
-              step="1"
-              value={settings.numRows}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  numRows: parseInt(e.target.value),
-                }))
-              }
-              className="w-full"
-              aria-labelledby="rows-label"
-              aria-valuemin={1}
-              aria-valuemax={26}
-              aria-valuenow={settings.numRows}
-            />
-            <span className="text-sm" aria-hidden="true">
-              {settings.numRows} filas
-            </span>
-          </div>
+            <div>
+              <label className="block mb-2" id="rows-label">
+                Número de filas
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="26"
+                step="1"
+                value={settings.numRows}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    numRows: parseInt(e.target.value),
+                  }))
+                }
+                className="w-full"
+                aria-labelledby="rows-label"
+                aria-valuemin={1}
+                aria-valuemax={26}
+                aria-valuenow={settings.numRows}
+              />
+              <span className="text-sm" aria-hidden="true">
+                {settings.numRows} filas
+              </span>
+            </div>
 
-          <div>
-            <label className="block mb-2" id="font-size-label">
-              Tamaño de texto del teclado (%)
-            </label>
-            <input
-              type="range"
-              min="0.5"
-              max="80"
-              step="0.5"
-              value={settings.fontSize}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  fontSize: parseFloat(e.target.value),
-                }))
-              }
-              className="w-full"
-              aria-labelledby="font-size-label"
-              aria-valuemin={0.5}
-              aria-valuemax={80}
-              aria-valuenow={settings.fontSize}
-            />
-            <span className="text-sm" aria-hidden="true">
-              {Math.round(settings.fontSize * 100)}%
-            </span>
-          </div>
+            <div>
+              <label className="block mb-2" id="font-size-label">
+                Tamaño de texto del teclado (%)
+              </label>
+              <input
+                type="range"
+                min="0.5"
+                max="80"
+                step="0.5"
+                value={settings.fontSize}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    fontSize: parseFloat(e.target.value),
+                  }))
+                }
+                className="w-full"
+                aria-labelledby="font-size-label"
+                aria-valuemin={0.5}
+                aria-valuemax={80}
+                aria-valuenow={settings.fontSize}
+              />
+              <span className="text-sm" aria-hidden="true">
+                {Math.round(settings.fontSize * 100)}%
+              </span>
+            </div>
 
-          <div>
-            <label className="block mb-2">Tamaño de texto del área (%)</label>
-            <input
-              type="range"
-              min="0.5"
-              max="15"
-              step="0.25"
-              value={settings.textareaFontSize}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  textareaFontSize: parseFloat(e.target.value),
-                }))
-              }
-              className="w-full"
-            />
-            <span className="text-sm">
-              {Math.round(settings.textareaFontSize * 100)}%
-            </span>
-          </div>
+            <div>
+              <label className="block mb-2">Tamaño de texto del área (%)</label>
+              <input
+                type="range"
+                min="0.5"
+                max="15"
+                step="0.25"
+                value={settings.textareaFontSize}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    textareaFontSize: parseFloat(e.target.value),
+                  }))
+                }
+                className="w-full"
+              />
+              <span className="text-sm">
+                {Math.round(settings.textareaFontSize * 100)}%
+              </span>
+            </div>
 
-          <div>
-            <label className="block mb-2">Distribución</label>
-            <select
-              value={settings.layout}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  layout: e.target.value as "qwerty" | "abc",
-                }))
-              }
-              className={`w-full p-2 rounded ${
-                settings.theme === "dark"
-                  ? "bg-gray-700"
-                  : settings.theme === "high-contrast"
-                  ? "bg-black border border-yellow-300"
-                  : "bg-white"
-              }`}
-            >
-              <option value="qwerty">QWERTY</option>
-              <option value="abc">ABC</option>
-            </select>
-          </div>
+            <div>
+              <label className="block mb-2">Distribución</label>
+              <select
+                value={settings.layout}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    layout: e.target.value as "qwerty" | "abc",
+                  }))
+                }
+                className={`w-full p-2 rounded ${
+                  settings.theme === "dark"
+                    ? "bg-gray-700"
+                    : settings.theme === "high-contrast"
+                    ? "bg-black border border-yellow-300"
+                    : "bg-white"
+                }`}
+              >
+                <option value="qwerty">QWERTY</option>
+                <option value="abc">ABC</option>
+              </select>
+            </div>
 
-          <div className="flex items-center justify-between">
-            <label>Sonido</label>
-            <button
-              onClick={() =>
-                setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
-              }
-              className={`px-4 py-2 rounded ${
-                settings.soundEnabled ? "bg-green-500" : "bg-gray-500"
-              }`}
-            >
-              {settings.soundEnabled ? "Activado" : "Desactivado"}
-            </button>
-          </div>
+            <div className="flex items-center justify-between">
+              <label>Sonido</label>
+              <button
+                onClick={() =>
+                  setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
+                }
+                className={`px-4 py-2 rounded ${
+                  settings.soundEnabled ? "bg-green-500" : "bg-gray-500"
+                }`}
+              >
+                {settings.soundEnabled ? "Activado" : "Desactivado"}
+              </button>
+            </div>
 
-          {/* Botón de Reset */}
-          <div className="mt-6 pt-4 border-t">
-            <button
-              onClick={() => {
-                setSettings(DEFAULT_SETTINGS);
-                localStorage.removeItem("keyboardSettings");
-              }}
-              className={`w-full px-4 py-2 rounded ${
-                settings.theme === "dark"
-                  ? "bg-red-600 hover:bg-red-700"
-                  : settings.theme === "high-contrast"
-                  ? "bg-red-500 text-black hover:bg-red-600"
-                  : "bg-red-500 hover:bg-red-600"
-              } text-white font-semibold transition-colors`}
-              aria-label="Restablecer configuración por defecto"
-            >
-              Restablecer Configuración
-            </button>
+            {/* Presets Section */}
+            <div className="mt-4 border-t pt-4">
+              <h3 className="text-lg font-semibold mb-2">Presets</h3>
+
+              {/* Save New Preset */}
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                  placeholder="Nombre del preset"
+                  className="flex-1 px-2 py-1 border rounded"
+                />
+                <button
+                  onClick={() => {
+                    if (newPresetName.trim()) {
+                      handleSavePreset(newPresetName.trim());
+                      setNewPresetName("");
+                    }
+                  }}
+                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Guardar
+                </button>
+              </div>
+
+              {/* Preset List */}
+              <div className="space-y-2">
+                {presets.map((preset) => (
+                  <div
+                    key={preset.name}
+                    className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded"
+                  >
+                    <span>{preset.name}</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleLoadPreset(preset)}
+                        className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                      >
+                        Cargar
+                      </button>
+                      <button
+                        onClick={() => handleDeletePreset(preset.name)}
+                        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Botón de Reset */}
+            <div className="mt-6 pt-4 border-t">
+              <button
+                onClick={() => {
+                  setSettings(DEFAULT_SETTINGS);
+                  localStorage.removeItem("keyboardSettings");
+                }}
+                className={`w-full px-4 py-2 rounded ${
+                  settings.theme === "dark"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : settings.theme === "high-contrast"
+                    ? "bg-red-500 text-black hover:bg-red-600"
+                    : "bg-red-500 hover:bg-red-600"
+                } text-white font-semibold transition-colors`}
+                aria-label="Restablecer configuración por defecto"
+              >
+                Restablecer Configuración
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const keyClasses = `
+    flex items-center justify-center
+    w-full h-full
+    rounded-lg
+    transition-colors
+    ${getThemeClasses(settings.theme)}
+    text-center
+    p-2
+    select-none
+    touch-none
+    ${settings.fontSize ? `text-[${settings.fontSize}rem]` : "text-xl"}
+  `;
+
+  const handleSavePreset = (name: string) => {
+    savePreset(name, settings);
+    setPresets(loadPresets());
+  };
+
+  const handleLoadPreset = (preset: Preset) => {
+    setSettings(preset.settings);
+    saveSettings(preset.settings);
+  };
+
+  const handleDeletePreset = (name: string) => {
+    deletePreset(name);
+    setPresets(loadPresets());
+  };
 
   return (
     <div
@@ -780,7 +887,7 @@ const VirtualKeyboard: React.FC = () => {
                           ? "scale-95"
                           : "scale-100"
                       }
-                      ${getThemeClasses(settings.theme)}
+                      ${keyClasses}
                       shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
                       flex items-center justify-center touch-manipulation select-none
                       ${isSpaceKey ? "text-2xl" : ""}
