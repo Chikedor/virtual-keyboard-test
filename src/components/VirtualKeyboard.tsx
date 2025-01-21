@@ -18,8 +18,8 @@ interface KeyboardSettings {
   soundEnabled: boolean;
   theme: "light" | "dark" | "high-contrast";
   numRows: number;
-  fontSize: number;
-  textareaFontSize: number;
+  fontSize: number; // Percentage of key size (1-100)
+  textareaFontSize: number; // In pixels (8-142)
   spacing: number;
   layout: "qwerty" | "abc";
   maintainLayout: boolean;
@@ -35,8 +35,8 @@ const DEFAULT: KeyboardSettings = {
   soundEnabled: true,
   theme: "light",
   numRows: 3,
-  fontSize: 1.25,
-  textareaFontSize: 1.25,
+  fontSize: 50, // 50% of key size
+  textareaFontSize: 16, // 16px
   spacing: 2,
   layout: "qwerty",
   maintainLayout: true,
@@ -164,12 +164,16 @@ export default function VirtualKeyboard() {
 
   // Key size
   const keySize = () => {
-    if (!contRef.current) return60;
+    if (!contRef.current) return 60;
     const cw = contRef.current.offsetWidth - 32;
     const ch = window.innerHeight - (showTA ? 40 : 0) - 80;
-    const totalRows = st.numRows + 1;
+    const totalRows = st.maintainLayout
+      ? LAYOUTS[st.layout].length
+      : st.numRows;
     const hpr = ch / totalRows;
-    const maxK = Math.ceil(26 / st.numRows);
+    const maxK = st.maintainLayout
+      ? Math.max(...LAYOUTS[st.layout].map((row) => row.length))
+      : Math.ceil(26 / st.numRows);
     const wpk = cw / maxK;
     return Math.min(hpr, wpk) * 0.9;
   };
@@ -239,27 +243,27 @@ export default function VirtualKeyboard() {
               <span>{st.numRows} filas</span>
             </div>
             <div>
-              <label>Tamaño de texto del teclado (%)</label>
+              <label>Tamaño de texto del teclado (% del tamaño de tecla)</label>
               <input
                 type="range"
-                min="0.5"
-                max="80"
-                step="0.5"
+                min="1"
+                max="95"
+                step="1"
                 value={st.fontSize}
                 onChange={(e) =>
                   setSt((s) => ({ ...s, fontSize: parseFloat(e.target.value) }))
                 }
                 className="w-full"
               />
-              <span>{Math.round(st.fontSize * 100)}%</span>
+              <span>{st.fontSize}%</span>
             </div>
             <div>
-              <label>Tamaño de texto del área (%)</label>
+              <label>Tamaño de texto del área (px)</label>
               <input
                 type="range"
-                min="0.5"
-                max="15"
-                step="0.25"
+                min="8"
+                max="142"
+                step="2"
                 value={st.textareaFontSize}
                 onChange={(e) =>
                   setSt((s) => ({
@@ -269,7 +273,7 @@ export default function VirtualKeyboard() {
                 }
                 className="w-full"
               />
-              <span>{Math.round(st.textareaFontSize * 100)}%</span>
+              <span>{st.textareaFontSize}px</span>
             </div>
             <div>
               <label>Distribución</label>
@@ -501,10 +505,10 @@ export default function VirtualKeyboard() {
                     : "bg-white border-gray-300 text-gray-900"
                 }`}
                 style={{
-                  minHeight: `${Math.max(1, st.textareaFontSize)}em`,
+                  minHeight: `${Math.max(1, st.textareaFontSize)}px`,
                   maxHeight: "20vh",
                   resize: "none",
-                  fontSize: `${st.textareaFontSize}em`,
+                  fontSize: `${st.textareaFontSize}px`,
                   overflow: "hidden",
                   lineHeight: "1.2",
                 }}
@@ -573,7 +577,12 @@ export default function VirtualKeyboard() {
                     style={{
                       width: keySize() + "px",
                       height: keySize() + "px",
-                      fontSize: st.fontSize + "rem",
+                      fontSize: (keySize() * st.fontSize) / 100 + "px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      textAlign: "center",
+                      lineHeight: 1,
                     }}
                   >
                     {k}
