@@ -17,7 +17,7 @@ interface KeyboardSettings {
   holdTime: number;
   soundEnabled: boolean;
   theme: "light" | "dark" | "high-contrast";
-  numRows: number;
+  numRows: number; // En modo optimizado: número de filas, en modo estándar: factor de zoom (1-200%)
   fontSize: number; // Percentage of key size (1-100)
   textareaFontSize: number; // In pixels (8-142)
   spacing: number;
@@ -107,26 +107,49 @@ export default function VirtualKeyboard() {
 
   // Layout calculado
   const calcLayout = useCallback(() => {
-    const allKeys = LAYOUTS[st.layout].flat();
-    const spaceKey = allKeys.find((k) => k === "␣");
-    const bsKey = allKeys.find((k) => k === "⌫");
-    const reg = allKeys.filter((k) => k !== "␣" && k !== "⌫");
-    if (st.maintainLayout) return LAYOUTS[st.layout];
-    const kpRow = Math.ceil(reg.length / st.numRows),
-      newLay = [];
-    for (let i = 0; i < reg.length; i += kpRow)
-      newLay.push(reg.slice(i, i + kpRow));
-    let lr = newLay[newLay.length - 1];
-    if (lr && lr.length < kpRow) {
-      bsKey && lr.push(bsKey);
-      spaceKey && lr.length < kpRow && lr.push(spaceKey);
-    } else {
-      const sp = [];
-      bsKey && sp.push(bsKey);
-      spaceKey && sp.push(spaceKey);
-      sp.length && newLay.push(sp);
+    if (st.maintainLayout) {
+      return LAYOUTS[st.layout];
     }
-    return newLay;
+
+    // Modo optimizado
+    const allKeys = LAYOUTS[st.layout].flat();
+    const spaceKey = allKeys.find((k) => k === "␣") || "␣";
+    const bsKey = allKeys.find((k) => k === "⌫") || "⌫";
+    const regularKeys = allKeys.filter((k) => k !== "␣" && k !== "⌫");
+
+    // Calcular distribución óptima
+    const totalKeys = regularKeys.length;
+    const keysPerRow = Math.ceil(Math.sqrt(totalKeys)); // Intentar hacer un cuadrado
+    const numRows = Math.min(st.numRows, Math.ceil(totalKeys / keysPerRow));
+    const actualKeysPerRow = Math.ceil(totalKeys / numRows);
+
+    // Crear layout base
+    const newLayout: string[][] = [];
+    for (let row = 0; row < numRows; row++) {
+      const start = row * actualKeysPerRow;
+      const end = Math.min(start + actualKeysPerRow, regularKeys.length);
+      const currentRow = regularKeys.slice(start, end);
+
+      // Rellenar última fila con teclas especiales si hay espacio
+      if (row === numRows - 1 && currentRow.length < actualKeysPerRow) {
+        const remainingSpace = actualKeysPerRow - currentRow.length;
+        if (remainingSpace >= 2) {
+          currentRow.push(bsKey, spaceKey);
+        } else if (remainingSpace === 1) {
+          currentRow.push(bsKey);
+        }
+      }
+
+      newLayout.push(currentRow);
+    }
+
+    // Si no se añadieron las teclas especiales, crear nueva fila
+    if (!newLayout.flat().includes("⌫") || !newLayout.flat().includes("␣")) {
+      const specialRow = [bsKey, spaceKey];
+      newLayout.push(specialRow);
+    }
+
+    return newLayout;
   }, [st.layout, st.numRows, st.maintainLayout]);
 
   const [layout, setLayout] = useState<string[][]>([]);
@@ -165,17 +188,31 @@ export default function VirtualKeyboard() {
   // Key size
   const keySize = () => {
     if (!contRef.current) return 60;
-    const cw = contRef.current.offsetWidth - 32;
-    const ch = window.innerHeight - (showTA ? 40 : 0) - 80;
-    const totalRows = st.maintainLayout
-      ? LAYOUTS[st.layout].length
-      : st.numRows;
-    const hpr = ch / totalRows;
-    const maxK = st.maintainLayout
-      ? Math.max(...LAYOUTS[st.layout].map((row) => row.length))
-      : Math.ceil(26 / st.numRows);
-    const wpk = cw / maxK;
-    return Math.min(hpr, wpk) * 0.9;
+
+    const containerWidth = contRef.current.offsetWidth - 32;
+    const headerHeight = 64; // 4rem
+    const textAreaHeight = showTA
+      ? parseInt(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--text-area-height"
+          ) || "0",
+          10
+        )
+      : 0;
+    const containerHeight =
+      window.innerHeight - headerHeight - textAreaHeight - 16;
+
+    const currentLayout = layout || LAYOUTS[st.layout];
+    const numRows = currentLayout.length;
+    const maxKeysInRow = Math.max(...currentLayout.map((row) => row.length));
+
+    // Calcular tamaño basado en el espacio disponible
+    const keyWidth = containerWidth / maxKeysInRow;
+    const keyHeight = containerHeight / numRows;
+    const baseSize = Math.min(keyWidth, keyHeight) * 0.9;
+
+    // En modo estándar, aplicar el zoom
+    return st.maintainLayout ? baseSize * (st.numRows / 100) : baseSize;
   };
 
   const SettingPanel = () => {
@@ -228,11 +265,13 @@ export default function VirtualKeyboard() {
               <span>{st.holdTime}s</span>
             </div>
             <div>
-              <label>Número de filas</label>
+              <label>
+                {st.maintainLayout ? "Zoom (%)" : "Número de filas"}
+              </label>
               <input
                 type="range"
-                min="1"
-                max="26"
+                min={st.maintainLayout ? "25" : "1"}
+                max={st.maintainLayout ? "200" : "26"}
                 step="1"
                 value={st.numRows}
                 onChange={(e) =>
@@ -240,7 +279,9 @@ export default function VirtualKeyboard() {
                 }
                 className="w-full"
               />
-              <span>{st.numRows} filas</span>
+              <span>
+                {st.maintainLayout ? `${st.numRows}%` : `${st.numRows} filas`}
+              </span>
             </div>
             <div>
               <label>Tamaño de texto del teclado (% del tamaño de tecla)</label>
@@ -531,7 +572,7 @@ export default function VirtualKeyboard() {
         <div
           style={{
             height: showTA
-              ? "calc(4rem + var(--text-area-height, 0px))"
+              ? `calc(4rem + var(--text-area-height, 0px))`
               : "4rem",
             transition: "height 300ms",
           }}
@@ -548,6 +589,9 @@ export default function VirtualKeyboard() {
             className={`fixed bottom-0 left-0 right-0 p-4 ${
               st.theme === "dark" ? "bg-gray-800" : "bg-gray-200"
             }`}
+            style={{
+              paddingBottom: "env(safe-area-inset-bottom, 16px)",
+            }}
           >
             {layout.map((row, r) => (
               <div key={r} className="flex justify-center mb-2">
