@@ -595,6 +595,131 @@ const VirtualKeyboard: React.FC = () => {
     setPresets(loadPresets());
   };
 
+  const [touchStartPositions, setTouchStartPositions] = useState<{
+    [key: number]: { x: number; y: number };
+  }>({});
+  const [activeKeys, setActiveKeys] = useState<{ [key: number]: string }>({});
+  const MOVEMENT_THRESHOLD = 8; // píxeles
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      e.preventDefault();
+      const newTouchPositions: { [key: number]: { x: number; y: number } } = {};
+      const newActiveKeys: { [key: number]: string } = {};
+
+      Array.from(e.touches).forEach((touch) => {
+        const key = findClosestKey(touch.clientX, touch.clientY);
+        if (key) {
+          newTouchPositions[touch.identifier] = {
+            x: touch.clientX,
+            y: touch.clientY,
+          };
+          newActiveKeys[touch.identifier] = key;
+          const isSpecial = key === "⌫" || key === "␣";
+          handleKeyDown(isSpecial ? key : key.toLowerCase());
+        }
+      });
+
+      setTouchStartPositions(newTouchPositions);
+      setActiveKeys(newActiveKeys);
+    },
+    [findClosestKey, handleKeyDown]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      Array.from(e.touches).forEach((touch) => {
+        const startPos = touchStartPositions[touch.identifier];
+        if (startPos) {
+          const deltaX = Math.abs(touch.clientX - startPos.x);
+          const deltaY = Math.abs(touch.clientY - startPos.y);
+
+          // Si el movimiento excede el threshold, cancelar el touch
+          if (deltaX > MOVEMENT_THRESHOLD || deltaY > MOVEMENT_THRESHOLD) {
+            const activeKey = activeKeys[touch.identifier];
+            if (activeKey) {
+              const isSpecial = activeKey === "⌫" || activeKey === "␣";
+              handleKeyUp(isSpecial ? activeKey : activeKey.toLowerCase());
+
+              // Limpiar este touch
+              const newActiveKeys = { ...activeKeys };
+              delete newActiveKeys[touch.identifier];
+              setActiveKeys(newActiveKeys);
+
+              const newTouchPositions = { ...touchStartPositions };
+              delete newTouchPositions[touch.identifier];
+              setTouchStartPositions(newTouchPositions);
+            }
+          } else {
+            // Si está dentro del threshold, actualizar la tecla activa si cambió
+            const newKey = findClosestKey(touch.clientX, touch.clientY);
+            const currentKey = activeKeys[touch.identifier];
+
+            if (newKey && newKey !== currentKey) {
+              if (currentKey) {
+                const isSpecialCurrent =
+                  currentKey === "⌫" || currentKey === "␣";
+                handleKeyUp(
+                  isSpecialCurrent ? currentKey : currentKey.toLowerCase()
+                );
+              }
+
+              const isSpecialNew = newKey === "⌫" || newKey === "␣";
+              handleKeyDown(isSpecialNew ? newKey : newKey.toLowerCase());
+
+              setActiveKeys((prev) => ({
+                ...prev,
+                [touch.identifier]: newKey,
+              }));
+            }
+          }
+        }
+      });
+    },
+    [
+      touchStartPositions,
+      activeKeys,
+      findClosestKey,
+      handleKeyDown,
+      handleKeyUp,
+    ]
+  );
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      e.preventDefault();
+      Array.from(e.changedTouches).forEach((touch) => {
+        const activeKey = activeKeys[touch.identifier];
+        if (activeKey) {
+          const isSpecial = activeKey === "⌫" || activeKey === "␣";
+          handleKeyUp(isSpecial ? activeKey : activeKey.toLowerCase());
+        }
+      });
+
+      // Limpiar los touches terminados
+      const newActiveKeys = { ...activeKeys };
+      Array.from(e.changedTouches).forEach((touch) => {
+        delete newActiveKeys[touch.identifier];
+      });
+      setActiveKeys(newActiveKeys);
+
+      const newTouchPositions = { ...touchStartPositions };
+      Array.from(e.changedTouches).forEach((touch) => {
+        delete newTouchPositions[touch.identifier];
+      });
+      setTouchStartPositions(newTouchPositions);
+    },
+    [activeKeys, touchStartPositions, handleKeyUp]
+  );
+
+  const handleTouchCancel = useCallback(
+    (e: React.TouchEvent) => {
+      // Tratar touchcancel igual que touchend para limpiar el estado
+      handleTouchEnd(e);
+    },
+    [handleTouchEnd]
+  );
+
   return (
     <>
       {/* Capa de flash */}
@@ -826,55 +951,10 @@ const VirtualKeyboard: React.FC = () => {
             className="virtual-keyboard w-full mx-auto px-2 pb-20 select-none"
             role="application"
             aria-label="Teclas del teclado"
-            onTouchStart={(e) => {
-              if ((e.target as HTMLElement).tagName === "BUTTON") {
-                e.preventDefault();
-                const key = findClosestKey(
-                  e.touches[0].clientX,
-                  e.touches[0].clientY
-                );
-                if (key) {
-                  const isSpecial = key === "⌫" || key === "␣";
-                  handleKeyDown(isSpecial ? key : key.toLowerCase());
-                }
-              }
-            }}
-            onTouchEnd={(e) => {
-              if ((e.target as HTMLElement).tagName === "BUTTON") {
-                e.preventDefault();
-                const key = findClosestKey(
-                  e.changedTouches[0].clientX,
-                  e.changedTouches[0].clientY
-                );
-                if (key) {
-                  const isSpecial = key === "⌫" || key === "␣";
-                  handleKeyUp(isSpecial ? key : key.toLowerCase());
-                }
-              }
-            }}
-            onTouchMove={(e) => {
-              const target = e.target as HTMLElement;
-              // Solo procesar el movimiento si estamos sobre un botón
-              if (target.tagName === "BUTTON") {
-                const touchStartY = e.touches[0].clientY;
-                const touchCurrentY = e.touches[0].clientY;
-                const deltaY = Math.abs(touchCurrentY - touchStartY);
-
-                // Si el movimiento vertical es pequeño, asumimos que es interacción con tecla
-                if (deltaY < 10) {
-                  e.preventDefault();
-                  const key = findClosestKey(
-                    e.touches[0].clientX,
-                    e.touches[0].clientY
-                  );
-                  if (key && key !== activeKey) {
-                    if (activeKey) handleKeyUp(activeKey);
-                    const isSpecial = key === "⌫" || key === "␣";
-                    handleKeyDown(isSpecial ? key : key.toLowerCase());
-                  }
-                }
-              }
-            }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchCancel}
           >
             {layout.map((row, rowIndex) => (
               <div
