@@ -1,11 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  TouchEvent,
+  ChangeEvent,
+} from "react";
 import { Volume2, VolumeX, Sun, Moon, Settings, X } from "lucide-react";
 
+// Interfaces
 interface KeyTimer {
   timeout?: number;
   startTime?: number;
 }
-
 interface KeyboardSettings {
   holdTime: number;
   soundEnabled: boolean;
@@ -15,15 +22,15 @@ interface KeyboardSettings {
   textareaFontSize: number;
   spacing: number;
   layout: "qwerty" | "abc";
+  maintainLayout: boolean;
 }
-
 interface Preset {
   name: string;
   settings: KeyboardSettings;
 }
 
-// Configuración por defecto
-const DEFAULT_SETTINGS: KeyboardSettings = {
+// Constantes
+const DEFAULT: KeyboardSettings = {
   holdTime: 0.1,
   soundEnabled: true,
   theme: "light",
@@ -32,36 +39,8 @@ const DEFAULT_SETTINGS: KeyboardSettings = {
   textareaFontSize: 1.25,
   spacing: 2,
   layout: "qwerty",
+  maintainLayout: true,
 };
-
-const loadSettings = (): KeyboardSettings => {
-  const saved = localStorage.getItem("keyboardSettings");
-  return saved
-    ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
-    : DEFAULT_SETTINGS;
-};
-
-const saveSettings = (settings: KeyboardSettings): void => {
-  localStorage.setItem("keyboardSettings", JSON.stringify(settings));
-};
-
-const loadPresets = (): Preset[] => {
-  const saved = localStorage.getItem("keyboardPresets");
-  return saved ? JSON.parse(saved) : [];
-};
-
-const savePreset = (name: string, settings: KeyboardSettings): void => {
-  const presets = loadPresets();
-  presets.push({ name, settings });
-  localStorage.setItem("keyboardPresets", JSON.stringify(presets));
-};
-
-const deletePreset = (name: string): void => {
-  const presets = loadPresets().filter((preset) => preset.name !== name);
-  localStorage.setItem("keyboardPresets", JSON.stringify(presets));
-};
-
-// Definir las teclas en ambos órdenes
 const LAYOUTS = {
   qwerty: [
     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
@@ -69,405 +48,243 @@ const LAYOUTS = {
     ["Z", "X", "C", "V", "B", "N", "M", "␣"],
   ],
   abc: [
-    ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
-    ["K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"],
-    ["U", "V", "W", "X", "Y", "Z", "⌫", "␣"],
+    ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
+    ["J", "K", "L", "M", "N", "O", "P", "Q", "R"],
+    ["S", "T", "U", "V", "W", "X", "Y", "Z", "⌫"],
+    ["␣"],
   ],
 };
 
-const getThemeClasses = (theme: string) => {
-  switch (theme) {
-    case "dark":
-      return "bg-gray-700 hover:bg-gray-600 text-gray-100 border-gray-600";
-    case "high-contrast":
-      return "bg-yellow-300 hover:bg-yellow-400 text-black";
-    default:
-      return "bg-white hover:bg-gray-100 text-gray-900";
-  }
+// Funciones de Storage
+const save = (k: string, v: any) => localStorage.setItem(k, JSON.stringify(v));
+const load = (k: string) => {
+  const data = localStorage.getItem(k);
+  return data ? JSON.parse(data) : null;
+};
+const loadSettings = (): KeyboardSettings =>
+  load("keyboardSettings")
+    ? { ...DEFAULT, ...load("keyboardSettings") }
+    : DEFAULT;
+const saveSettings = (s: KeyboardSettings) => save("keyboardSettings", s);
+const loadPresets = (): Preset[] => load("keyboardPresets") || [];
+const savePreset = (name: string, set: KeyboardSettings) => {
+  const p = loadPresets();
+  p.push({ name, settings: set });
+  save("keyboardPresets", p);
+};
+const deletePreset = (name: string) => {
+  const filtered = loadPresets().filter((p) => p.name !== name);
+  save("keyboardPresets", filtered);
 };
 
-const VirtualKeyboard: React.FC = () => {
-  const [input, setInput] = useState("");
-  const [settings, setSettings] = useState<KeyboardSettings>(loadSettings());
-  const [presets, setPresets] = useState<Preset[]>(loadPresets());
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [isFlashing, setIsFlashing] = useState(false);
-  const keyTimers = useRef<{ [key: string]: KeyTimer }>({});
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [showTextArea, setShowTextArea] = useState(false);
+// Helpers
+const themeClasses = (t: string) => {
+  if (t === "dark")
+    return "bg-gray-700 hover:bg-gray-600 text-gray-100 border-2";
+  if (t === "high-contrast")
+    return "bg-yellow-300 hover:bg-yellow-400 text-black border-2";
+  return "bg-white hover:bg-gray-100 text-gray-900 border-2";
+};
+const ariaLabel = (k: string) =>
+  k === "␣" ? "Tecla espacio" : k === "⌫" ? "Tecla borrar" : `Tecla ${k}`;
 
-  // Caché de posiciones de teclas
-  const keyPositionsRef = useRef<{
-    positions: Array<{
-      key: string;
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    }>;
-    lastUpdate: number;
-  }>({ positions: [], lastUpdate: 0 });
+// Componente principal
+export default function VirtualKeyboard() {
+  const [inp, setInp] = useState("");
+  const [st, setSt] = useState<KeyboardSettings>(loadSettings());
+  const [prs, setPrs] = useState<Preset[]>(loadPresets());
+  const [actK, setActK] = useState<string | null>(null);
+  const [showSet, setShowSet] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const [showTA, setShowTA] = useState(false);
+  const kRef = useRef<{ [k: string]: KeyTimer }>({});
+  const contRef = useRef<HTMLDivElement | null>(null);
 
-  // Actualizar caché de posiciones
-  const updateKeyPositions = useCallback(() => {
-    if (!containerRef.current) return;
-
-    const buttons = containerRef.current.getElementsByTagName("button");
-    const positions = [];
-
-    for (const button of buttons) {
-      const rect = button.getBoundingClientRect();
-      positions.push({
-        key: button.textContent || "",
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-        width: rect.width,
-        height: rect.height,
-      });
-    }
-
-    keyPositionsRef.current = {
-      positions,
-      lastUpdate: Date.now(),
-    };
-  }, []);
-
-  // Actualizar posiciones cuando cambie el layout
+  // Guardado
   useEffect(() => {
-    updateKeyPositions();
-    const observer = new ResizeObserver(updateKeyPositions);
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-    return () => observer.disconnect();
-  }, [settings.numRows, settings.layout]);
+    saveSettings(st);
+  }, [st]);
 
-  const findClosestKey = useCallback((x: number, y: number) => {
-    const { positions, lastUpdate } = keyPositionsRef.current;
-
-    // Si el caché tiene más de 1 segundo, actualizarlo
-    if (Date.now() - lastUpdate > 1000) {
-      updateKeyPositions();
-    }
-
-    let closest = null;
-    let minDistance = Infinity;
-
-    // Optimización: primero buscar en un radio razonable
-    const searchRadius = 100; // píxeles
-
-    for (const pos of positions) {
-      const dx = x - pos.x;
-      const dy = y - pos.y;
-
-      // Si está dentro del radio de búsqueda
-      if (Math.abs(dx) <= searchRadius && Math.abs(dy) <= searchRadius) {
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < minDistance) {
-          minDistance = distance;
-          closest = pos.key;
-        }
-      }
-    }
-
-    // Si no encontramos nada en el radio, buscar en todas las teclas
-    if (!closest) {
-      for (const pos of positions) {
-        const dx = x - pos.x;
-        const dy = y - pos.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < minDistance) {
-          minDistance = distance;
-          closest = pos.key;
-        }
-      }
-    }
-
-    return closest;
-  }, []);
-
-  // Guardar configuraciones cuando cambien
-  useEffect(() => {
-    saveSettings(settings);
-  }, [settings]);
-
-  const handleKeyDown = useCallback((key: string) => {
-    if (keyTimers.current[key]?.timeout) return;
-
-    setActiveKey(key);
-    keyTimers.current[key] = {
-      startTime: Date.now(),
-    };
-  }, []);
-
-  const handleKeyUp = useCallback(
-    (key: string) => {
-      const keyTimer = keyTimers.current[key];
-      if (!keyTimer?.startTime) return;
-
-      const holdDuration = (Date.now() - keyTimer.startTime) / 1000;
-      setActiveKey(null);
-
-      if (holdDuration >= settings.holdTime) {
-        const keySound = new Audio(
-          "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
-        );
-        if (settings.soundEnabled) {
-          keySound.play();
-        }
-
-        if (key === "⌫" || key === "backspace") {
-          setInput((prev) => prev.slice(0, -1));
-        } else if (key === "␣" || key === "space") {
-          setInput((prev) => prev + " ");
-        } else {
-          setInput((prev) => prev + key);
-        }
-
-        // Activar el flash
-        setIsFlashing(true);
-        setTimeout(() => setIsFlashing(false), 150); // Duración del flash
-      }
-
-      delete keyTimers.current[key];
-    },
-    [settings.holdTime, settings.soundEnabled]
-  );
-
-  const calculateKeySize = useCallback(() => {
-    if (!containerRef.current) return 60;
-
-    const containerWidth = containerRef.current.offsetWidth - 32;
-    const containerHeight = window.innerHeight - (showTextArea ? 40 : 0) - 80;
-    const totalRows = settings.numRows + 1;
-
-    const heightPerRow = containerHeight / totalRows;
-    const maxKeysInRow = Math.ceil(26 / settings.numRows);
-    const widthPerKey = containerWidth / maxKeysInRow;
-
-    return Math.min(heightPerRow, widthPerKey) * 0.9;
-  }, [containerRef.current?.offsetWidth, showTextArea, settings.numRows]);
-
-  const calculateLayout = useCallback(() => {
-    if (!containerRef.current) return [];
-    const allKeys = LAYOUTS[settings.layout].flat();
-
-    // Separar teclas especiales
+  // Layout calculado
+  const calcLayout = useCallback(() => {
+    const allKeys = LAYOUTS[st.layout].flat();
     const spaceKey = allKeys.find((k) => k === "␣");
-    const backspaceKey = allKeys.find((k) => k === "⌫");
-    const regularKeys = allKeys.filter((k) => k !== "␣" && k !== "⌫");
-
-    // Calcular teclas por fila basado en el número de filas deseado
-    const totalRegularKeys = regularKeys.length;
-    const keysPerRow = Math.ceil(totalRegularKeys / settings.numRows);
-
-    // Distribuir teclas regulares en filas
-    const newLayout: string[][] = [];
-    for (let i = 0; i < regularKeys.length; i += keysPerRow) {
-      const row = regularKeys.slice(i, i + keysPerRow);
-      newLayout.push(row);
+    const bsKey = allKeys.find((k) => k === "⌫");
+    const reg = allKeys.filter((k) => k !== "␣" && k !== "⌫");
+    if (st.maintainLayout) return LAYOUTS[st.layout];
+    const kpRow = Math.ceil(reg.length / st.numRows),
+      newLay = [];
+    for (let i = 0; i < reg.length; i += kpRow)
+      newLay.push(reg.slice(i, i + kpRow));
+    let lr = newLay[newLay.length - 1];
+    if (lr && lr.length < kpRow) {
+      bsKey && lr.push(bsKey);
+      spaceKey && lr.length < kpRow && lr.push(spaceKey);
+    } else {
+      const sp = [];
+      bsKey && sp.push(bsKey);
+      spaceKey && sp.push(spaceKey);
+      sp.length && newLay.push(sp);
     }
-
-    // Manejar última fila
-    const lastRow = newLayout[newLayout.length - 1];
-    if (lastRow && lastRow.length < keysPerRow) {
-      // Si la última fila no está completa, añadir backspace
-      if (backspaceKey) {
-        lastRow.push(backspaceKey);
-      }
-    } else if (backspaceKey) {
-      // Si la última fila está completa, crear nueva fila para backspace
-      newLayout.push([backspaceKey]);
-    }
-
-    // Añadir barra espaciadora en su propia fila
-    if (spaceKey) {
-      newLayout.push([spaceKey]);
-    }
-
-    return newLayout;
-  }, [settings.layout, settings.numRows]);
+    return newLay;
+  }, [st.layout, st.numRows, st.maintainLayout]);
 
   const [layout, setLayout] = useState<string[][]>([]);
-
   useEffect(() => {
-    const updateLayout = () => {
-      setLayout(calculateLayout());
-    };
+    const ul = () => setLayout(calcLayout());
+    ul();
+    window.addEventListener("resize", ul);
+    return () => window.removeEventListener("resize", ul);
+  }, [calcLayout]);
 
-    updateLayout();
-    window.addEventListener("resize", updateLayout);
-    return () => window.removeEventListener("resize", updateLayout);
-  }, [calculateLayout]);
-
-  const getKeyAriaLabel = (key: string) => {
-    switch (key) {
-      case "␣":
-        return "Tecla espacio";
-      case "⌫":
-        return "Tecla borrar";
-      default:
-        return `Tecla ${key}`;
+  // Disparo de tecla
+  const down = (k: string) => {
+    if (kRef.current[k]?.timeout) return;
+    setActK(k);
+    kRef.current[k] = { startTime: Date.now() };
+  };
+  const up = (k: string) => {
+    const kt = kRef.current[k];
+    if (!kt?.startTime) return;
+    setActK(null);
+    const dur = (Date.now() - kt.startTime) / 1e3;
+    delete kRef.current[k];
+    if (dur >= st.holdTime) {
+      if (st.soundEnabled)
+        new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
+        ).play();
+      if (k === "⌫") setInp((p) => p.slice(0, -1));
+      else if (k === "␣") setInp((p) => p + " ");
+      else setInp((p) => p + k);
+      setFlash(true);
+      setTimeout(() => setFlash(false), 150);
     }
   };
 
-  // Componente de Settings
-  const SettingsPanel = () => {
-    const [newPresetName, setNewPresetName] = useState("");
+  // Key size
+  const keySize = () => {
+    if (!contRef.current) return60;
+    const cw = contRef.current.offsetWidth - 32;
+    const ch = window.innerHeight - (showTA ? 40 : 0) - 80;
+    const totalRows = st.numRows + 1;
+    const hpr = ch / totalRows;
+    const maxK = Math.ceil(26 / st.numRows);
+    const wpk = cw / maxK;
+    return Math.min(hpr, wpk) * 0.9;
+  };
 
+  const SettingPanel = () => {
+    const [pName, setPName] = useState("");
+    const handleLoadPreset = (p: Preset) => {
+      setSt(p.settings);
+      saveSettings(p.settings);
+    };
     return (
       <div
         className={`fixed inset-0 bg-black bg-opacity-50 z-30 ${
-          showSettings ? "flex" : "hidden"
-        } items-center justify-center p-4`}
+          showSet ? "flex" : "hidden"
+        } items-center justify-center p-4 overflow-y-auto`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="settings-title"
       >
         <div
-          className={`relative w-full max-w-md p-6 rounded-xl shadow-lg ${
-            settings.theme === "dark"
+          className={`relative w-full max-w-md max-h-[90vh] flex flex-col rounded-xl shadow-lg ${
+            st.theme === "dark"
               ? "bg-gray-800"
-              : settings.theme === "high-contrast"
+              : st.theme === "high-contrast"
               ? "bg-black border-2 border-yellow-300"
               : "bg-white"
           }`}
-          role="document"
         >
-          <button
-            onClick={() => setShowSettings(false)}
-            className="absolute top-4 right-4"
-            aria-label="Cerrar configuración"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          <h2
-            id="settings-title"
-            className="text-xl font-bold mb-4"
-            role="heading"
-            aria-level={2}
-          >
-            Configuración
-          </h2>
-
-          <div className="space-y-4">
+          <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-inherit rounded-t-xl">
+            <h2 className="text-xl font-bold">Configuración</h2>
+            <button
+              onClick={() => setShowSet(false)}
+              className="p-2 hover:bg-opacity-10 hover:bg-black rounded-full transition-colors"
+              aria-label="Cerrar configuración"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div>
-              <label className="block mb-2" id="hold-time-label">
-                Tiempo de pulsación (segundos)
-              </label>
+              <label>Tiempo de pulsación (segundos)</label>
               <input
                 type="range"
                 min="0.1"
                 max="1.0"
                 step="0.1"
-                value={settings.holdTime}
+                value={st.holdTime}
                 onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    holdTime: parseFloat(e.target.value),
-                  }))
+                  setSt((s) => ({ ...s, holdTime: parseFloat(e.target.value) }))
                 }
                 className="w-full"
-                aria-labelledby="hold-time-label"
-                aria-valuemin={0.1}
-                aria-valuemax={1.0}
-                aria-valuenow={settings.holdTime}
               />
-              <span className="text-sm" aria-hidden="true">
-                {settings.holdTime}s
-              </span>
+              <span>{st.holdTime}s</span>
             </div>
-
             <div>
-              <label className="block mb-2" id="rows-label">
-                Número de filas
-              </label>
+              <label>Número de filas</label>
               <input
                 type="range"
                 min="1"
                 max="26"
                 step="1"
-                value={settings.numRows}
+                value={st.numRows}
                 onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    numRows: parseInt(e.target.value),
-                  }))
+                  setSt((s) => ({ ...s, numRows: parseInt(e.target.value) }))
                 }
                 className="w-full"
-                aria-labelledby="rows-label"
-                aria-valuemin={1}
-                aria-valuemax={26}
-                aria-valuenow={settings.numRows}
               />
-              <span className="text-sm" aria-hidden="true">
-                {settings.numRows} filas
-              </span>
+              <span>{st.numRows} filas</span>
             </div>
-
             <div>
-              <label className="block mb-2" id="font-size-label">
-                Tamaño de texto del teclado (%)
-              </label>
+              <label>Tamaño de texto del teclado (%)</label>
               <input
                 type="range"
                 min="0.5"
                 max="80"
                 step="0.5"
-                value={settings.fontSize}
+                value={st.fontSize}
                 onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    fontSize: parseFloat(e.target.value),
-                  }))
+                  setSt((s) => ({ ...s, fontSize: parseFloat(e.target.value) }))
                 }
                 className="w-full"
-                aria-labelledby="font-size-label"
-                aria-valuemin={0.5}
-                aria-valuemax={80}
-                aria-valuenow={settings.fontSize}
               />
-              <span className="text-sm" aria-hidden="true">
-                {Math.round(settings.fontSize * 100)}%
-              </span>
+              <span>{Math.round(st.fontSize * 100)}%</span>
             </div>
-
             <div>
-              <label className="block mb-2">Tamaño de texto del área (%)</label>
+              <label>Tamaño de texto del área (%)</label>
               <input
                 type="range"
                 min="0.5"
                 max="15"
                 step="0.25"
-                value={settings.textareaFontSize}
+                value={st.textareaFontSize}
                 onChange={(e) =>
-                  setSettings((s) => ({
+                  setSt((s) => ({
                     ...s,
                     textareaFontSize: parseFloat(e.target.value),
                   }))
                 }
                 className="w-full"
               />
-              <span className="text-sm">
-                {Math.round(settings.textareaFontSize * 100)}%
-              </span>
+              <span>{Math.round(st.textareaFontSize * 100)}%</span>
             </div>
-
             <div>
-              <label className="block mb-2">Distribución</label>
+              <label>Distribución</label>
               <select
-                value={settings.layout}
+                value={st.layout}
                 onChange={(e) =>
-                  setSettings((s) => ({
+                  setSt((s) => ({
                     ...s,
                     layout: e.target.value as "qwerty" | "abc",
                   }))
                 }
                 className={`w-full p-2 rounded ${
-                  settings.theme === "dark"
+                  st.theme === "dark"
                     ? "bg-gray-700"
-                    : settings.theme === "high-contrast"
+                    : st.theme === "high-contrast"
                     ? "bg-black border border-yellow-300"
                     : "bg-white"
                 }`}
@@ -476,39 +293,53 @@ const VirtualKeyboard: React.FC = () => {
                 <option value="abc">ABC</option>
               </select>
             </div>
-
             <div className="flex items-center justify-between">
               <label>Sonido</label>
               <button
                 onClick={() =>
-                  setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
+                  setSt((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
                 }
                 className={`px-4 py-2 rounded ${
-                  settings.soundEnabled ? "bg-green-500" : "bg-gray-500"
+                  st.soundEnabled ? "bg-green-500" : "bg-gray-500"
                 }`}
               >
-                {settings.soundEnabled ? "Activado" : "Desactivado"}
+                {st.soundEnabled ? "Activado" : "Desactivado"}
               </button>
             </div>
-
-            {/* Presets Section */}
+            <div className="flex items-center justify-between mt-4">
+              <label className="flex-1">Disposición del Teclado</label>
+              <button
+                onClick={() =>
+                  setSt((s) => ({ ...s, maintainLayout: !s.maintainLayout }))
+                }
+                className={`px-4 py-2 rounded ${
+                  st.maintainLayout ? "bg-blue-500" : "bg-gray-500"
+                } text-white`}
+              >
+                {st.maintainLayout ? "Estándar" : "Optimizado"}
+              </button>
+            </div>
+            <p className="text-sm text-gray-500">
+              {st.maintainLayout
+                ? "Mantiene layout tradicional"
+                : "Layout optimizado"}
+            </p>
             <div className="mt-4 border-t pt-4">
               <h3 className="text-lg font-semibold mb-2">Presets</h3>
-
-              {/* Save New Preset */}
               <div className="flex gap-2 mb-4">
                 <input
                   type="text"
-                  value={newPresetName}
-                  onChange={(e) => setNewPresetName(e.target.value)}
+                  value={pName}
+                  onChange={(e) => setPName(e.target.value)}
                   placeholder="Nombre del preset"
                   className="flex-1 px-2 py-1 border rounded"
                 />
                 <button
                   onClick={() => {
-                    if (newPresetName.trim()) {
-                      handleSavePreset(newPresetName.trim());
-                      setNewPresetName("");
+                    if (pName.trim()) {
+                      savePreset(pName.trim(), st);
+                      setPrs(loadPresets());
+                      setPName("");
                     }
                   }}
                   className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -516,25 +347,26 @@ const VirtualKeyboard: React.FC = () => {
                   Guardar
                 </button>
               </div>
-
-              {/* Preset List */}
               <div className="space-y-2">
-                {presets.map((preset) => (
+                {prs.map((p) => (
                   <div
-                    key={preset.name}
+                    key={p.name}
                     className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded"
                   >
-                    <span>{preset.name}</span>
+                    <span>{p.name}</span>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleLoadPreset(preset)}
-                        className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                        onClick={() => handleLoadPreset(p)}
+                        className="px-2 py-1 bg-green-500 text-white rounded"
                       >
                         Cargar
                       </button>
                       <button
-                        onClick={() => handleDeletePreset(preset.name)}
-                        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                        onClick={() => {
+                          deletePreset(p.name);
+                          setPrs(loadPresets());
+                        }}
+                        className="px-2 py-1 bg-red-500 text-white rounded"
                       >
                         Eliminar
                       </button>
@@ -543,24 +375,21 @@ const VirtualKeyboard: React.FC = () => {
                 ))}
               </div>
             </div>
-
-            {/* Botón de Reset */}
             <div className="mt-6 pt-4 border-t">
               <button
                 onClick={() => {
-                  setSettings(DEFAULT_SETTINGS);
+                  setSt(DEFAULT);
                   localStorage.removeItem("keyboardSettings");
                 }}
                 className={`w-full px-4 py-2 rounded ${
-                  settings.theme === "dark"
+                  st.theme === "dark"
                     ? "bg-red-600 hover:bg-red-700"
-                    : settings.theme === "high-contrast"
+                    : st.theme === "high-contrast"
                     ? "bg-red-500 text-black hover:bg-red-600"
                     : "bg-red-500 hover:bg-red-600"
-                } text-white font-semibold transition-colors`}
-                aria-label="Restablecer configuración por defecto"
+                } text-white font-semibold`}
               >
-                Restablecer Configuración
+                Restablecer
               </button>
             </div>
           </div>
@@ -569,490 +398,187 @@ const VirtualKeyboard: React.FC = () => {
     );
   };
 
-  const keyClasses = `
-    relative
-    w-full h-full
-    rounded-lg
-    transition-colors
-    ${getThemeClasses(settings.theme)}
-    select-none
-    touch-none
-    overflow-hidden
-  `;
-
-  const handleSavePreset = (name: string) => {
-    savePreset(name, settings);
-    setPresets(loadPresets());
-  };
-
-  const handleLoadPreset = (preset: Preset) => {
-    setSettings(preset.settings);
-    saveSettings(preset.settings);
-  };
-
-  const handleDeletePreset = (name: string) => {
-    deletePreset(name);
-    setPresets(loadPresets());
-  };
-
-  const [touchStartPositions, setTouchStartPositions] = useState<{
-    [key: number]: { x: number; y: number };
-  }>({});
-  const [activeKeys, setActiveKeys] = useState<{ [key: number]: string }>({});
-  const MOVEMENT_THRESHOLD = 8; // píxeles
-
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      e.preventDefault();
-      const newTouchPositions: { [key: number]: { x: number; y: number } } = {};
-      const newActiveKeys: { [key: number]: string } = {};
-
-      Array.from(e.touches).forEach((touch) => {
-        const key = findClosestKey(touch.clientX, touch.clientY);
-        if (key) {
-          newTouchPositions[touch.identifier] = {
-            x: touch.clientX,
-            y: touch.clientY,
-          };
-          newActiveKeys[touch.identifier] = key;
-          const isSpecial = key === "⌫" || key === "␣";
-          handleKeyDown(isSpecial ? key : key.toLowerCase());
-        }
-      });
-
-      setTouchStartPositions(newTouchPositions);
-      setActiveKeys(newActiveKeys);
-    },
-    [findClosestKey, handleKeyDown]
-  );
-
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      Array.from(e.touches).forEach((touch) => {
-        const startPos = touchStartPositions[touch.identifier];
-        if (startPos) {
-          const deltaX = Math.abs(touch.clientX - startPos.x);
-          const deltaY = Math.abs(touch.clientY - startPos.y);
-
-          // Si el movimiento excede el threshold, cancelar el touch
-          if (deltaX > MOVEMENT_THRESHOLD || deltaY > MOVEMENT_THRESHOLD) {
-            const activeKey = activeKeys[touch.identifier];
-            if (activeKey) {
-              const isSpecial = activeKey === "⌫" || activeKey === "␣";
-              handleKeyUp(isSpecial ? activeKey : activeKey.toLowerCase());
-
-              // Limpiar este touch
-              const newActiveKeys = { ...activeKeys };
-              delete newActiveKeys[touch.identifier];
-              setActiveKeys(newActiveKeys);
-
-              const newTouchPositions = { ...touchStartPositions };
-              delete newTouchPositions[touch.identifier];
-              setTouchStartPositions(newTouchPositions);
-            }
-          } else {
-            // Si está dentro del threshold, actualizar la tecla activa si cambió
-            const newKey = findClosestKey(touch.clientX, touch.clientY);
-            const currentKey = activeKeys[touch.identifier];
-
-            if (newKey && newKey !== currentKey) {
-              if (currentKey) {
-                const isSpecialCurrent =
-                  currentKey === "⌫" || currentKey === "␣";
-                handleKeyUp(
-                  isSpecialCurrent ? currentKey : currentKey.toLowerCase()
-                );
-              }
-
-              const isSpecialNew = newKey === "⌫" || newKey === "␣";
-              handleKeyDown(isSpecialNew ? newKey : newKey.toLowerCase());
-
-              setActiveKeys((prev) => ({
-                ...prev,
-                [touch.identifier]: newKey,
-              }));
-            }
-          }
-        }
-      });
-    },
-    [
-      touchStartPositions,
-      activeKeys,
-      findClosestKey,
-      handleKeyDown,
-      handleKeyUp,
-    ]
-  );
-
-  const handleTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
-      e.preventDefault();
-      Array.from(e.changedTouches).forEach((touch) => {
-        const activeKey = activeKeys[touch.identifier];
-        if (activeKey) {
-          const isSpecial = activeKey === "⌫" || activeKey === "␣";
-          handleKeyUp(isSpecial ? activeKey : activeKey.toLowerCase());
-        }
-      });
-
-      // Limpiar los touches terminados
-      const newActiveKeys = { ...activeKeys };
-      Array.from(e.changedTouches).forEach((touch) => {
-        delete newActiveKeys[touch.identifier];
-      });
-      setActiveKeys(newActiveKeys);
-
-      const newTouchPositions = { ...touchStartPositions };
-      Array.from(e.changedTouches).forEach((touch) => {
-        delete newTouchPositions[touch.identifier];
-      });
-      setTouchStartPositions(newTouchPositions);
-    },
-    [activeKeys, touchStartPositions, handleKeyUp]
-  );
-
-  const handleTouchCancel = useCallback(
-    (e: React.TouchEvent) => {
-      // Tratar touchcancel igual que touchend para limpiar el estado
-      handleTouchEnd(e);
-    },
-    [handleTouchEnd]
-  );
-
+  // Render
   return (
     <>
-      {/* Capa de flash */}
       <div
         className={`fixed inset-0 pointer-events-none z-50 transition-opacity duration-150 ${
-          isFlashing ? "opacity-30" : "opacity-0"
+          flash ? "opacity-30" : "opacity-0"
         } ${
-          settings.theme === "dark"
+          st.theme === "dark"
             ? "bg-gray-300"
-            : settings.theme === "high-contrast"
+            : st.theme === "high-contrast"
             ? "bg-yellow-300"
             : "bg-white"
         }`}
-        aria-hidden="true"
       />
       <div
         className={`min-h-screen relative ${
-          settings.theme === "dark"
+          st.theme === "dark"
             ? "bg-gray-900 text-gray-100"
-            : settings.theme === "high-contrast"
+            : st.theme === "high-contrast"
             ? "bg-black text-yellow-300"
             : "bg-gray-100 text-gray-900"
         }`}
         role="application"
-        aria-label="Teclado Virtual Accesible"
       >
-        {/* Barra superior fija */}
-        <div
-          className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg"
-          role="banner"
-        >
+        <div className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg">
           <div className="flex justify-between items-center p-4">
             <div className="flex items-center gap-4 flex-1">
-              <h1 className="text-2xl font-bold" role="heading" aria-level={1}>
-                Teclado Accesible
-              </h1>
+              <h1 className="text-2xl font-bold">Teclado Accesible</h1>
               <button
                 onClick={() => {
-                  setShowTextArea(!showTextArea);
-                  if (!showTextArea) {
-                    // Si estamos mostrando el área de texto, inicializar la altura
-                    setTimeout(() => {
-                      const textarea = document.querySelector("textarea");
-                      if (textarea) {
-                        const height = textarea.scrollHeight;
-                        document.documentElement.style.setProperty(
-                          "--text-area-height",
-                          `${height + 32}px`
-                        );
-                      }
-                    }, 0);
-                  }
+                  setShowTA(!showTA);
                 }}
-                className={`px-3 py-1 rounded-lg transition-colors ${
-                  settings.theme === "dark"
+                className={`px-3 py-1 rounded-lg ${
+                  st.theme === "dark"
                     ? "bg-gray-700 hover:bg-gray-600"
-                    : settings.theme === "high-contrast"
+                    : st.theme === "high-contrast"
                     ? "bg-yellow-300 hover:bg-yellow-400 text-black"
                     : "bg-white hover:bg-gray-100"
                 }`}
-                aria-pressed={showTextArea}
-                aria-controls="text-area"
               >
-                {showTextArea ? "Ocultar Texto" : "Mostrar Texto"}
+                {showTA ? "Ocultar Texto" : "Mostrar Texto"}
               </button>
               <div
-                className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap transition-colors duration-150 ${
-                  settings.theme === "dark"
-                    ? `bg-gray-800 ${isFlashing ? "bg-gray-600" : ""}`
-                    : settings.theme === "high-contrast"
-                    ? `bg-black border border-yellow-300 ${
-                        isFlashing ? "bg-yellow-900" : ""
-                      }`
-                    : `bg-gray-200 ${isFlashing ? "bg-gray-300" : ""}`
+                className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap ${
+                  st.theme === "dark"
+                    ? "bg-gray-800"
+                    : st.theme === "high-contrast"
+                    ? "bg-black border border-yellow-300"
+                    : "bg-gray-200"
                 }`}
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-                aria-label="Texto escrito"
                 style={{
                   minWidth: "50px",
                   maxWidth: "calc(100% - 300px)",
-                  width: "fit-content",
                   minHeight: "2.5rem",
                   display: "flex",
                   alignItems: "center",
                 }}
               >
-                <span className="inline-block min-w-[1ch]">{input || " "}</span>
+                <span className="inline-block min-w-[1ch]">{inp || " "}</span>
               </div>
             </div>
-            <div
-              className="flex gap-4 ml-4"
-              role="toolbar"
-              aria-label="Controles rápidos"
-            >
+            <div className="flex gap-4 ml-4" role="toolbar">
               <button
                 onClick={() =>
-                  setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
-                }
-                aria-pressed={settings.soundEnabled}
-                aria-label={
-                  settings.soundEnabled ? "Desactivar sonido" : "Activar sonido"
+                  setSt((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
                 }
               >
-                {settings.soundEnabled ? (
-                  <Volume2 className="w-6 h-6 cursor-pointer" />
-                ) : (
-                  <VolumeX className="w-6 h-6 cursor-pointer" />
-                )}
+                {st.soundEnabled ? <Volume2 /> : <VolumeX />}
               </button>
               <button
                 onClick={() =>
-                  setSettings((s) => ({
+                  setSt((s) => ({
                     ...s,
                     theme: s.theme === "light" ? "dark" : "light",
                   }))
                 }
-                aria-pressed={settings.theme === "dark"}
-                aria-label={
-                  settings.theme === "light"
-                    ? "Cambiar a tema oscuro"
-                    : "Cambiar a tema claro"
-                }
               >
-                {settings.theme === "light" ? (
-                  <Moon className="w-6 h-6 cursor-pointer" />
-                ) : (
-                  <Sun className="w-6 h-6 cursor-pointer" />
-                )}
+                {st.theme === "light" ? <Moon /> : <Sun />}
               </button>
-              <button
-                onClick={() => setShowSettings(true)}
-                aria-expanded={showSettings}
-                aria-haspopup="dialog"
-                aria-label="Abrir configuración"
-              >
-                <Settings className="w-6 h-6 cursor-pointer" />
+              <button onClick={() => setShowSet(true)}>
+                <Settings />
               </button>
             </div>
           </div>
-
-          {/* Área de texto desplegable */}
           <div
-            id="text-area"
             className={`transition-all duration-300 overflow-hidden ${
-              showTextArea ? "max-h-[60vh]" : "max-h-0"
+              showTA ? "max-h-[60vh]" : "max-h-0"
             }`}
-            role="region"
-            aria-label="Área de texto"
-            aria-expanded={showTextArea}
           >
             <div className="p-4">
               <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                aria-label="Área de texto para escribir"
-                aria-describedby="text-area-description"
-                role="textbox"
-                className={`w-full p-2 rounded-lg border-2 transition-all ${
-                  settings.theme === "dark"
-                    ? "bg-gray-800 border-gray-600 text-gray-100 focus:border-blue-400 focus:ring focus:ring-blue-400/20"
-                    : settings.theme === "high-contrast"
-                    ? "bg-black border-yellow-300 text-yellow-300 focus:border-yellow-400 focus:ring focus:ring-yellow-400/20"
-                    : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                value={inp}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  setInp(e.target.value)
+                }
+                className={`w-full p-2 rounded-lg border-2 ${
+                  st.theme === "dark"
+                    ? "bg-gray-800 border-gray-600 text-gray-100"
+                    : st.theme === "high-contrast"
+                    ? "bg-black border-yellow-300 text-yellow-300"
+                    : "bg-white border-gray-300 text-gray-900"
                 }`}
                 style={{
-                  minHeight: `${Math.max(1, settings.textareaFontSize)}em`,
+                  minHeight: `${Math.max(1, st.textareaFontSize)}em`,
                   maxHeight: "20vh",
-                  height: "auto",
                   resize: "none",
-                  fontSize: `${settings.textareaFontSize}em`,
+                  fontSize: `${st.textareaFontSize}em`,
                   overflow: "hidden",
                   lineHeight: "1.2",
-                  padding: `${Math.max(
-                    0.25,
-                    settings.textareaFontSize * 0.15
-                  )}em`,
                 }}
                 onInput={(e) => {
-                  const textarea = e.currentTarget;
-                  textarea.style.height = "auto";
-                  const newHeight = Math.min(
-                    textarea.scrollHeight,
-                    window.innerHeight * 0.2
-                  );
-                  textarea.style.height = `${newHeight}px`;
-                  // Actualizar la variable CSS para el espacio reservado
+                  const t = e.currentTarget;
+                  t.style.height = "auto";
+                  const nh = Math.min(t.scrollHeight, window.innerHeight * 0.2);
+                  t.style.height = `${nh}px`;
                   document.documentElement.style.setProperty(
                     "--text-area-height",
-                    `${newHeight + 32}px`
+                    `${nh + 32}px`
                   );
                 }}
               />
-              <div id="text-area-description" className="sr-only">
-                Área de texto donde aparecerá lo que escribas usando el teclado
-                virtual
-              </div>
             </div>
           </div>
         </div>
 
-        <SettingsPanel />
-
-        {/* Espacio para la barra superior y área de texto */}
+        <SettingPanel />
         <div
           style={{
-            height: showTextArea
+            height: showTA
               ? "calc(4rem + var(--text-area-height, 0px))"
               : "4rem",
-            transition: "height 300ms ease-in-out",
+            transition: "height 300ms",
           }}
         />
-
-        {/* Área del teclado con scroll independiente */}
         <div
-          className="fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit select-none"
+          className={`fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit select-none`}
           style={{
-            top: showTextArea
-              ? "calc(4rem + var(--text-area-height, 0px))"
-              : "4rem",
-            transition: "top 300ms ease-in-out",
+            top: showTA ? "calc(4rem + var(--text-area-height, 0px))" : "4rem",
+            transition: "top 300ms",
           }}
-          role="group"
-          aria-label="Teclado virtual"
         >
           <div
-            ref={containerRef}
-            className="virtual-keyboard w-full mx-auto px-2 pb-20 select-none"
-            role="application"
-            aria-label="Teclas del teclado"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchCancel}
+            ref={contRef}
+            className={`fixed bottom-0 left-0 right-0 p-4 ${
+              st.theme === "dark" ? "bg-gray-800" : "bg-gray-200"
+            }`}
           >
-            {layout.map((row, rowIndex) => (
-              <div
-                key={rowIndex}
-                className="flex justify-between gap-1 px-2 mb-1"
-                style={{
-                  width: "100%",
-                }}
-              >
-                {row.map((key) => {
-                  const isSpaceKey = key === "␣";
-                  const isBackspaceKey = key === "⌫";
-                  const isLastRow = rowIndex === layout.length - 1;
-                  const keyWidth = isLastRow
-                    ? `${100 / row.length}%`
-                    : `${100 / row.length}%`;
-
-                  return (
-                    <button
-                      key={key}
-                      role="button"
-                      aria-label={getKeyAriaLabel(key)}
-                      aria-pressed={
-                        activeKey ===
-                        (isSpaceKey || isBackspaceKey ? key : key.toLowerCase())
-                      }
-                      onMouseDown={() => {
-                        const processedKey =
-                          isSpaceKey || isBackspaceKey
-                            ? key
-                            : key.toLowerCase();
-                        handleKeyDown(processedKey);
-                      }}
-                      onMouseUp={() => {
-                        const processedKey =
-                          isSpaceKey || isBackspaceKey
-                            ? key
-                            : key.toLowerCase();
-                        handleKeyUp(processedKey);
-                      }}
-                      onMouseLeave={() => {
-                        const processedKey =
-                          isSpaceKey || isBackspaceKey
-                            ? key
-                            : key.toLowerCase();
-                        handleKeyUp(processedKey);
-                      }}
-                      onTouchStart={() => {
-                        const processedKey =
-                          isSpaceKey || isBackspaceKey
-                            ? key
-                            : key.toLowerCase();
-                        handleKeyDown(processedKey);
-                      }}
-                      onTouchEnd={() => {
-                        const processedKey =
-                          isSpaceKey || isBackspaceKey
-                            ? key
-                            : key.toLowerCase();
-                        handleKeyUp(processedKey);
-                      }}
-                      className={`
-                        font-semibold rounded-xl transition-all duration-200
-                        ${
-                          activeKey ===
-                          (isSpaceKey || isBackspaceKey
-                            ? key
-                            : key.toLowerCase())
-                            ? "scale-95"
-                            : "scale-100"
-                        }
-                        ${keyClasses}
-                        shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300
-                        touch-manipulation
-                      `}
-                      style={{
-                        width: keyWidth,
-                        aspectRatio: isLastRow ? "auto" : "1",
-                        height: isLastRow ? `${calculateKeySize()}px` : "auto",
-                        margin: "0 2px",
-                        padding: "0",
-                        minHeight: "44px",
-                      }}
-                    >
-                      <div
-                        className="absolute inset-0 flex items-center justify-center"
-                        style={{
-                          fontSize: isSpaceKey
-                            ? "1.5em"
-                            : `${settings.fontSize}em`,
-                          lineHeight: "1",
-                        }}
-                      >
-                        {key}
-                      </div>
-                    </button>
-                  );
-                })}
+            {layout.map((row, r) => (
+              <div key={r} className="flex justify-center mb-2">
+                {row.map((k) => (
+                  <button
+                    key={k}
+                    aria-label={ariaLabel(k)}
+                    onMouseDown={() => down(k)}
+                    onMouseUp={() => up(k)}
+                    onMouseLeave={() => up(k)}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      down(k);
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      up(k);
+                    }}
+                    className={`${themeClasses(st.theme)} mx-${
+                      st.spacing
+                    } rounded-lg font-semibold flex items-center justify-center
+                    ${
+                      actK === k
+                        ? "scale-95 border-blue-500 shadow-lg"
+                        : "border-transparent"
+                    }`}
+                    style={{
+                      width: keySize() + "px",
+                      height: keySize() + "px",
+                      fontSize: st.fontSize + "rem",
+                    }}
+                  >
+                    {k}
+                  </button>
+                ))}
               </div>
             ))}
           </div>
@@ -1060,6 +586,4 @@ const VirtualKeyboard: React.FC = () => {
       </div>
     </>
   );
-};
-
-export default VirtualKeyboard;
+}
