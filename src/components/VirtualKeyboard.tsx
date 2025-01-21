@@ -23,6 +23,7 @@ interface KeyboardSettings {
   spacing: number;
   layout: "qwerty" | "abc";
   maintainLayout: boolean;
+  instantMode: boolean; // Modo instantáneo sin delay
 }
 interface Preset {
   name: string;
@@ -40,6 +41,7 @@ const DEFAULT: KeyboardSettings = {
   spacing: 2,
   layout: "qwerty",
   maintainLayout: true,
+  instantMode: false, // Por defecto, modo con delay
 };
 const LAYOUTS = {
   qwerty: [
@@ -172,7 +174,7 @@ export default function VirtualKeyboard() {
     setActK(null);
     const dur = (Date.now() - kt.startTime) / 1e3;
     delete kRef.current[k];
-    if (dur >= st.holdTime) {
+    if (st.instantMode || dur >= st.holdTime) {
       if (st.soundEnabled)
         new Audio(
           "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
@@ -217,160 +219,229 @@ export default function VirtualKeyboard() {
 
   const SettingPanel = () => {
     const [pName, setPName] = useState("");
+    const [activeTab, setActiveTab] = useState<
+      "general" | "layout" | "text" | "presets"
+    >("general");
+
     const handleLoadPreset = (p: Preset) => {
       setSt(p.settings);
       saveSettings(p.settings);
     };
-    return (
-      <div
-        className={`fixed inset-0 bg-black bg-opacity-50 z-30 ${
-          showSet ? "flex" : "hidden"
-        } items-center justify-center p-4 overflow-y-auto`}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div
-          className={`relative w-full max-w-md max-h-[90vh] flex flex-col rounded-xl shadow-lg ${
-            st.theme === "dark"
-              ? "bg-gray-800"
+
+    const TabButton = ({
+      tab,
+      label,
+    }: {
+      tab: typeof activeTab;
+      label: string;
+    }) => (
+      <button
+        onClick={() => setActiveTab(tab)}
+        className={`px-4 py-2 rounded-t-lg transition-colors ${
+          activeTab === tab
+            ? st.theme === "dark"
+              ? "bg-gray-700 text-white"
               : st.theme === "high-contrast"
-              ? "bg-black border-2 border-yellow-300"
-              : "bg-white"
-          }`}
-        >
-          <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-inherit rounded-t-xl">
-            <h2 className="text-xl font-bold">Configuración</h2>
-            <button
-              onClick={() => setShowSet(false)}
-              className="p-2 hover:bg-opacity-10 hover:bg-black rounded-full transition-colors"
-              aria-label="Cerrar configuración"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div>
-              <label>Tiempo de pulsación (segundos)</label>
-              <input
-                type="range"
-                min="0.1"
-                max="1.0"
-                step="0.1"
-                value={st.holdTime}
-                onChange={(e) =>
-                  setSt((s) => ({ ...s, holdTime: parseFloat(e.target.value) }))
-                }
-                className="w-full"
-              />
-              <span>{st.holdTime}s</span>
+              ? "bg-yellow-300 text-black"
+              : "bg-white text-gray-900"
+            : "text-gray-500 hover:text-gray-700"
+        }`}
+      >
+        {label}
+      </button>
+    );
+
+    const renderTabContent = () => {
+      switch (activeTab) {
+        case "general":
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-opacity-10 bg-gray-500">
+                  <label>Sonido</label>
+                  <button
+                    onClick={() =>
+                      setSt((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
+                    }
+                    className={`px-4 py-2 rounded ${
+                      st.soundEnabled ? "bg-green-500" : "bg-gray-500"
+                    }`}
+                  >
+                    {st.soundEnabled ? "Activado" : "Desactivado"}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-opacity-10 bg-gray-500">
+                  <label>Modo Instantáneo</label>
+                  <button
+                    onClick={() =>
+                      setSt((s) => ({ ...s, instantMode: !s.instantMode }))
+                    }
+                    className={`px-4 py-2 rounded ${
+                      st.instantMode ? "bg-green-500" : "bg-gray-500"
+                    }`}
+                  >
+                    {st.instantMode ? "Activado" : "Desactivado"}
+                  </button>
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
+                <label>Tiempo de pulsación</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1.0"
+                    step="0.1"
+                    value={st.holdTime}
+                    onChange={(e) =>
+                      setSt((s) => ({
+                        ...s,
+                        holdTime: parseFloat(e.target.value),
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <span className="w-16 text-center">{st.holdTime}s</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <label>
-                {st.maintainLayout ? "Zoom (%)" : "Número de filas"}
-              </label>
-              <input
-                type="range"
-                min={st.maintainLayout ? "25" : "1"}
-                max={st.maintainLayout ? "200" : "26"}
-                step="1"
-                value={st.numRows}
-                onChange={(e) =>
-                  setSt((s) => ({ ...s, numRows: parseInt(e.target.value) }))
-                }
-                className="w-full"
-              />
-              <span>
-                {st.maintainLayout ? `${st.numRows}%` : `${st.numRows} filas`}
-              </span>
+          );
+        case "layout":
+          return (
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
+                <div className="flex items-center justify-between mb-2">
+                  <label>Disposición</label>
+                  <button
+                    onClick={() =>
+                      setSt((s) => ({
+                        ...s,
+                        maintainLayout: !s.maintainLayout,
+                      }))
+                    }
+                    className={`px-4 py-2 rounded ${
+                      st.maintainLayout ? "bg-blue-500" : "bg-gray-500"
+                    } text-white`}
+                  >
+                    {st.maintainLayout ? "Estándar" : "Optimizado"}
+                  </button>
+                </div>
+                <select
+                  value={st.layout}
+                  onChange={(e) =>
+                    setSt((s) => ({
+                      ...s,
+                      layout: e.target.value as "qwerty" | "abc",
+                    }))
+                  }
+                  className={`w-full p-2 rounded ${
+                    st.theme === "dark"
+                      ? "bg-gray-700"
+                      : st.theme === "high-contrast"
+                      ? "bg-black border border-yellow-300"
+                      : "bg-white"
+                  }`}
+                >
+                  <option value="qwerty">QWERTY</option>
+                  <option value="abc">ABC</option>
+                </select>
+              </div>
+              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
+                <label>
+                  {st.maintainLayout ? "Zoom (%)" : "Número de filas"}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={st.maintainLayout ? "25" : "1"}
+                    max={st.maintainLayout ? "200" : "26"}
+                    step="1"
+                    value={st.numRows}
+                    onChange={(e) =>
+                      setSt((s) => ({
+                        ...s,
+                        numRows: parseInt(e.target.value),
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <span className="w-16 text-center">
+                    {st.maintainLayout ? `${st.numRows}%` : st.numRows}
+                  </span>
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
+                <label>Espaciado</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="4"
+                    step="1"
+                    value={st.spacing}
+                    onChange={(e) =>
+                      setSt((s) => ({
+                        ...s,
+                        spacing: parseInt(e.target.value),
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <span className="w-16 text-center">{st.spacing}</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <label>Tamaño de texto del teclado (% del tamaño de tecla)</label>
-              <input
-                type="range"
-                min="1"
-                max="95"
-                step="1"
-                value={st.fontSize}
-                onChange={(e) =>
-                  setSt((s) => ({ ...s, fontSize: parseFloat(e.target.value) }))
-                }
-                className="w-full"
-              />
-              <span>{st.fontSize}%</span>
+          );
+        case "text":
+          return (
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
+                <label>Tamaño de texto del teclado (%)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="1"
+                    max="95"
+                    step="1"
+                    value={st.fontSize}
+                    onChange={(e) =>
+                      setSt((s) => ({
+                        ...s,
+                        fontSize: parseFloat(e.target.value),
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <span className="w-16 text-center">{st.fontSize}%</span>
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
+                <label>Tamaño de texto del área (px)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="8"
+                    max="142"
+                    step="2"
+                    value={st.textareaFontSize}
+                    onChange={(e) =>
+                      setSt((s) => ({
+                        ...s,
+                        textareaFontSize: parseFloat(e.target.value),
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <span className="w-16 text-center">
+                    {st.textareaFontSize}px
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <label>Tamaño de texto del área (px)</label>
-              <input
-                type="range"
-                min="8"
-                max="142"
-                step="2"
-                value={st.textareaFontSize}
-                onChange={(e) =>
-                  setSt((s) => ({
-                    ...s,
-                    textareaFontSize: parseFloat(e.target.value),
-                  }))
-                }
-                className="w-full"
-              />
-              <span>{st.textareaFontSize}px</span>
-            </div>
-            <div>
-              <label>Distribución</label>
-              <select
-                value={st.layout}
-                onChange={(e) =>
-                  setSt((s) => ({
-                    ...s,
-                    layout: e.target.value as "qwerty" | "abc",
-                  }))
-                }
-                className={`w-full p-2 rounded ${
-                  st.theme === "dark"
-                    ? "bg-gray-700"
-                    : st.theme === "high-contrast"
-                    ? "bg-black border border-yellow-300"
-                    : "bg-white"
-                }`}
-              >
-                <option value="qwerty">QWERTY</option>
-                <option value="abc">ABC</option>
-              </select>
-            </div>
-            <div className="flex items-center justify-between">
-              <label>Sonido</label>
-              <button
-                onClick={() =>
-                  setSt((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
-                }
-                className={`px-4 py-2 rounded ${
-                  st.soundEnabled ? "bg-green-500" : "bg-gray-500"
-                }`}
-              >
-                {st.soundEnabled ? "Activado" : "Desactivado"}
-              </button>
-            </div>
-            <div className="flex items-center justify-between mt-4">
-              <label className="flex-1">Disposición del Teclado</label>
-              <button
-                onClick={() =>
-                  setSt((s) => ({ ...s, maintainLayout: !s.maintainLayout }))
-                }
-                className={`px-4 py-2 rounded ${
-                  st.maintainLayout ? "bg-blue-500" : "bg-gray-500"
-                } text-white`}
-              >
-                {st.maintainLayout ? "Estándar" : "Optimizado"}
-              </button>
-            </div>
-            <p className="text-sm text-gray-500">
-              {st.maintainLayout
-                ? "Mantiene layout tradicional"
-                : "Layout optimizado"}
-            </p>
-            <div className="mt-4 border-t pt-4">
-              <h3 className="text-lg font-semibold mb-2">Presets</h3>
+          );
+        case "presets":
+          return (
+            <div className="space-y-4">
               <div className="flex gap-2 mb-4">
                 <input
                   type="text"
@@ -392,7 +463,7 @@ export default function VirtualKeyboard() {
                   Guardar
                 </button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[40vh] overflow-y-auto">
                 {prs.map((p) => (
                   <div
                     key={p.name}
@@ -420,23 +491,63 @@ export default function VirtualKeyboard() {
                 ))}
               </div>
             </div>
-            <div className="mt-6 pt-4 border-t">
-              <button
-                onClick={() => {
-                  setSt(DEFAULT);
-                  localStorage.removeItem("keyboardSettings");
-                }}
-                className={`w-full px-4 py-2 rounded ${
-                  st.theme === "dark"
-                    ? "bg-red-600 hover:bg-red-700"
-                    : st.theme === "high-contrast"
-                    ? "bg-red-500 text-black hover:bg-red-600"
-                    : "bg-red-500 hover:bg-red-600"
-                } text-white font-semibold`}
-              >
-                Restablecer
-              </button>
-            </div>
+          );
+      }
+    };
+
+    return (
+      <div
+        className={`fixed inset-0 bg-black bg-opacity-50 z-30 ${
+          showSet ? "flex" : "hidden"
+        } items-center justify-center p-4 overflow-y-auto`}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div
+          className={`relative w-full max-w-md max-h-[90vh] flex flex-col rounded-xl shadow-lg ${
+            st.theme === "dark"
+              ? "bg-gray-800"
+              : st.theme === "high-contrast"
+              ? "bg-black border-2 border-yellow-300"
+              : "bg-white"
+          }`}
+        >
+          <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-inherit rounded-t-xl">
+            <h2 className="text-xl font-bold">Configuración</h2>
+            <button
+              onClick={() => setShowSet(false)}
+              className="p-2 hover:bg-opacity-10 hover:bg-black rounded-full transition-colors"
+              aria-label="Cerrar configuración"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="flex border-b px-4">
+            <TabButton tab="general" label="General" />
+            <TabButton tab="layout" label="Teclado" />
+            <TabButton tab="text" label="Texto" />
+            <TabButton tab="presets" label="Presets" />
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">{renderTabContent()}</div>
+
+          <div className="p-4 border-t">
+            <button
+              onClick={() => {
+                setSt(DEFAULT);
+                localStorage.removeItem("keyboardSettings");
+              }}
+              className={`w-full px-4 py-2 rounded ${
+                st.theme === "dark"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : st.theme === "high-contrast"
+                  ? "bg-red-500 text-black hover:bg-red-600"
+                  : "bg-red-500 hover:bg-red-600"
+              } text-white font-semibold`}
+            >
+              Restablecer
+            </button>
           </div>
         </div>
       </div>
