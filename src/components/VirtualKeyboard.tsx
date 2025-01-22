@@ -17,13 +17,10 @@ interface KeyboardSettings {
   holdTime: number;
   soundEnabled: boolean;
   theme: "light" | "dark" | "high-contrast";
-  numRows: number; // En modo optimizado: número de filas, en modo estándar: factor de zoom (1-200%)
   fontSize: number; // Percentage of key size (1-100)
   textareaFontSize: number; // In pixels (8-142)
   spacing: number;
   layout: "qwerty" | "abc";
-  maintainLayout: boolean;
-  instantMode: boolean; // Modo instantáneo sin delay
 }
 interface Preset {
   name: string;
@@ -35,25 +32,23 @@ const DEFAULT: KeyboardSettings = {
   holdTime: 0.1,
   soundEnabled: true,
   theme: "light",
-  numRows: 3,
-  fontSize: 50, // 50% of key size
-  textareaFontSize: 16, // 16px
+  fontSize: 50,
+  textareaFontSize: 16,
   spacing: 2,
   layout: "qwerty",
-  maintainLayout: true,
-  instantMode: false, // Por defecto, modo con delay
 };
 const LAYOUTS = {
   qwerty: [
     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-    ["A", "S", "D", "F", "G", "H", "J", "K", "L", "⌫"],
-    ["Z", "X", "C", "V", "B", "N", "M", "␣"],
+    ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+    ["Z", "X", "C", "V", "B", "N", "M"],
+    ["␣", "⌫"],
   ],
   abc: [
     ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
     ["J", "K", "L", "M", "N", "O", "P", "Q", "R"],
-    ["S", "T", "U", "V", "W", "X", "Y", "Z", "⌫"],
-    ["␣"],
+    ["S", "T", "U", "V", "W", "X", "Y", "Z"],
+    ["␣", "⌫"],
   ],
 };
 
@@ -82,10 +77,10 @@ const deletePreset = (name: string) => {
 // Helpers
 const themeClasses = (t: string) => {
   if (t === "dark")
-    return "bg-gray-700 hover:bg-gray-600 text-gray-100 border-2";
+    return "bg-gray-700 hover:bg-gray-600 text-gray-100 border-2 flex items-center justify-center";
   if (t === "high-contrast")
-    return "bg-yellow-300 hover:bg-yellow-400 text-black border-2";
-  return "bg-white hover:bg-gray-100 text-gray-900 border-2";
+    return "bg-yellow-300 hover:bg-yellow-400 text-black border-2 flex items-center justify-center";
+  return "bg-white hover:bg-gray-100 text-gray-900 border-2 flex items-center justify-center";
 };
 const ariaLabel = (k: string) =>
   k === "␣" ? "Tecla espacio" : k === "⌫" ? "Tecla borrar" : `Tecla ${k}`;
@@ -99,6 +94,7 @@ export default function VirtualKeyboard() {
   const [showSet, setShowSet] = useState(false);
   const [flash, setFlash] = useState(false);
   const [showTA, setShowTA] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState("general");
   const kRef = useRef<{ [k: string]: KeyTimer }>({});
   const contRef = useRef<HTMLDivElement | null>(null);
 
@@ -109,50 +105,8 @@ export default function VirtualKeyboard() {
 
   // Layout calculado
   const calcLayout = useCallback(() => {
-    if (st.maintainLayout) {
-      return LAYOUTS[st.layout];
-    }
-
-    // Modo optimizado
-    const allKeys = LAYOUTS[st.layout].flat();
-    const spaceKey = allKeys.find((k) => k === "␣") || "␣";
-    const bsKey = allKeys.find((k) => k === "⌫") || "⌫";
-    const regularKeys = allKeys.filter((k) => k !== "␣" && k !== "⌫");
-
-    // Calcular distribución óptima
-    const totalKeys = regularKeys.length;
-    const keysPerRow = Math.ceil(Math.sqrt(totalKeys)); // Intentar hacer un cuadrado
-    const numRows = Math.min(st.numRows, Math.ceil(totalKeys / keysPerRow));
-    const actualKeysPerRow = Math.ceil(totalKeys / numRows);
-
-    // Crear layout base
-    const newLayout: string[][] = [];
-    for (let row = 0; row < numRows; row++) {
-      const start = row * actualKeysPerRow;
-      const end = Math.min(start + actualKeysPerRow, regularKeys.length);
-      const currentRow = regularKeys.slice(start, end);
-
-      // Rellenar última fila con teclas especiales si hay espacio
-      if (row === numRows - 1 && currentRow.length < actualKeysPerRow) {
-        const remainingSpace = actualKeysPerRow - currentRow.length;
-        if (remainingSpace >= 2) {
-          currentRow.push(bsKey, spaceKey);
-        } else if (remainingSpace === 1) {
-          currentRow.push(bsKey);
-        }
-      }
-
-      newLayout.push(currentRow);
-    }
-
-    // Si no se añadieron las teclas especiales, crear nueva fila
-    if (!newLayout.flat().includes("⌫") || !newLayout.flat().includes("␣")) {
-      const specialRow = [bsKey, spaceKey];
-      newLayout.push(specialRow);
-    }
-
-    return newLayout;
-  }, [st.layout, st.numRows, st.maintainLayout]);
+    return LAYOUTS[st.layout];
+  }, [st.layout]);
 
   const [layout, setLayout] = useState<string[][]>([]);
   useEffect(() => {
@@ -174,7 +128,7 @@ export default function VirtualKeyboard() {
     setActK(null);
     const dur = (Date.now() - kt.startTime) / 1e3;
     delete kRef.current[k];
-    if (st.instantMode || dur >= st.holdTime) {
+    if (dur >= st.holdTime) {
       if (st.soundEnabled)
         new Audio(
           "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
@@ -191,8 +145,8 @@ export default function VirtualKeyboard() {
   const keySize = () => {
     if (!contRef.current) return 60;
 
-    const containerWidth = contRef.current.offsetWidth - 32;
-    const headerHeight = 64; // 4rem
+    const containerWidth = contRef.current.offsetWidth - 32; // 32px de padding total
+    const headerHeight = 64; // 4rem para el header
     const textAreaHeight = showTA
       ? parseInt(
           getComputedStyle(document.documentElement).getPropertyValue(
@@ -201,143 +155,156 @@ export default function VirtualKeyboard() {
           10
         )
       : 0;
-    const containerHeight =
-      window.innerHeight - headerHeight - textAreaHeight - 16;
+
+    // Altura disponible total
+    const availableHeight =
+      window.innerHeight - headerHeight - textAreaHeight - 32; // 32px de padding total
 
     const currentLayout = layout || LAYOUTS[st.layout];
     const numRows = currentLayout.length;
     const maxKeysInRow = Math.max(...currentLayout.map((row) => row.length));
 
     // Calcular tamaño basado en el espacio disponible
-    const keyWidth = containerWidth / maxKeysInRow;
-    const keyHeight = containerHeight / numRows;
-    const baseSize = Math.min(keyWidth, keyHeight) * 0.9;
+    const keyWidth =
+      (containerWidth - (maxKeysInRow - 1) * st.spacing * 2) / maxKeysInRow;
+    const keyHeight =
+      (availableHeight - (numRows - 1) * st.spacing * 2) / numRows;
 
-    // En modo estándar, aplicar el zoom
-    return st.maintainLayout ? baseSize * (st.numRows / 100) : baseSize;
+    // Usar el menor valor para mantener teclas cuadradas, pero no menos de 40px
+    return Math.max(Math.min(keyWidth, keyHeight) * 0.95, 40);
   };
 
   const SettingPanel = () => {
     const [pName, setPName] = useState("");
-    const [activeTab, setActiveTab] = useState<
-      "general" | "layout" | "text" | "presets"
-    >("general");
+    const [editingSettings, setEditingSettings] = useState(st);
+
+    useEffect(() => {
+      setEditingSettings(st);
+    }, [showSet]); // Reset cuando se abre el panel
 
     const handleLoadPreset = (p: Preset) => {
+      setEditingSettings(p.settings);
       setSt(p.settings);
       saveSettings(p.settings);
     };
 
-    const TabButton = ({
-      tab,
-      label,
-    }: {
-      tab: typeof activeTab;
-      label: string;
-    }) => (
-      <button
-        onClick={() => setActiveTab(tab)}
-        className={`px-4 py-2 rounded-t-lg transition-colors ${
-          activeTab === tab
-            ? st.theme === "dark"
-              ? "bg-gray-700 text-white"
-              : st.theme === "high-contrast"
-              ? "bg-yellow-300 text-black"
-              : "bg-white text-gray-900"
-            : "text-gray-500 hover:text-gray-700"
-        }`}
-      >
-        {label}
-      </button>
-    );
+    const handleSave = () => {
+      setSt(editingSettings);
+      saveSettings(editingSettings);
+    };
+
+    const tabs = [
+      { id: "general", label: "General" },
+      { id: "keyboard", label: "Teclado" },
+      { id: "presets", label: "Presets" },
+    ];
 
     const renderTabContent = () => {
-      switch (activeTab) {
+      switch (activeSettingsTab) {
         case "general":
           return (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-opacity-10 bg-gray-500">
-                  <label>Sonido</label>
-                  <button
-                    onClick={() =>
-                      setSt((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
-                    }
-                    className={`px-4 py-2 rounded ${
-                      st.soundEnabled ? "bg-green-500" : "bg-gray-500"
-                    }`}
-                  >
-                    {st.soundEnabled ? "Activado" : "Desactivado"}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-opacity-10 bg-gray-500">
-                  <label>Modo Instantáneo</label>
-                  <button
-                    onClick={() =>
-                      setSt((s) => ({ ...s, instantMode: !s.instantMode }))
-                    }
-                    className={`px-4 py-2 rounded ${
-                      st.instantMode ? "bg-green-500" : "bg-gray-500"
-                    }`}
-                  >
-                    {st.instantMode ? "Activado" : "Desactivado"}
-                  </button>
-                </div>
-              </div>
-              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
-                <label>Tiempo de pulsación</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1.0"
-                    step="0.1"
-                    value={st.holdTime}
-                    onChange={(e) =>
-                      setSt((s) => ({
-                        ...s,
-                        holdTime: parseFloat(e.target.value),
-                      }))
-                    }
-                    className="flex-1"
-                  />
-                  <span className="w-16 text-center">{st.holdTime}s</span>
-                </div>
-              </div>
-            </div>
-          );
-        case "layout":
-          return (
-            <div className="space-y-4">
-              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
-                <div className="flex items-center justify-between mb-2">
-                  <label>Disposición</label>
-                  <button
-                    onClick={() =>
-                      setSt((s) => ({
-                        ...s,
-                        maintainLayout: !s.maintainLayout,
-                      }))
-                    }
-                    className={`px-4 py-2 rounded ${
-                      st.maintainLayout ? "bg-blue-500" : "bg-gray-500"
-                    } text-white`}
-                  >
-                    {st.maintainLayout ? "Estándar" : "Optimizado"}
-                  </button>
-                </div>
-                <select
-                  value={st.layout}
+            <>
+              <div>
+                <label>Tiempo de pulsación (segundos)</label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.1"
+                  value={editingSettings.holdTime}
                   onChange={(e) =>
-                    setSt((s) => ({
+                    setEditingSettings((s) => ({
                       ...s,
-                      layout: e.target.value as "qwerty" | "abc",
+                      holdTime: parseFloat(e.target.value),
                     }))
                   }
+                  onMouseUp={handleSave}
+                  onTouchEnd={handleSave}
+                  className="w-full"
+                />
+                <span>{editingSettings.holdTime}s</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <label>Sonido</label>
+                <button
+                  onClick={() => {
+                    setEditingSettings((s) => ({
+                      ...s,
+                      soundEnabled: !s.soundEnabled,
+                    }));
+                    handleSave();
+                  }}
+                  className={`px-4 py-2 rounded ${
+                    editingSettings.soundEnabled
+                      ? "bg-green-500"
+                      : "bg-gray-500"
+                  }`}
+                >
+                  {editingSettings.soundEnabled ? "Activado" : "Desactivado"}
+                </button>
+              </div>
+            </>
+          );
+        case "keyboard":
+          return (
+            <>
+              <div>
+                <label>
+                  Tamaño de texto del teclado (% del tamaño de tecla)
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="95"
+                  step="1"
+                  value={editingSettings.fontSize}
+                  onChange={(e) =>
+                    setEditingSettings((s) => ({
+                      ...s,
+                      fontSize: parseFloat(e.target.value),
+                    }))
+                  }
+                  onMouseUp={handleSave}
+                  onTouchEnd={handleSave}
+                  className="w-full"
+                />
+                <span>{editingSettings.fontSize}%</span>
+              </div>
+              <div>
+                <label>Tamaño de texto del área (px)</label>
+                <input
+                  type="range"
+                  min="8"
+                  max="142"
+                  step="2"
+                  value={editingSettings.textareaFontSize}
+                  onChange={(e) =>
+                    setEditingSettings((s) => ({
+                      ...s,
+                      textareaFontSize: parseFloat(e.target.value),
+                    }))
+                  }
+                  onMouseUp={handleSave}
+                  onTouchEnd={handleSave}
+                  className="w-full"
+                />
+                <span>{editingSettings.textareaFontSize}px</span>
+              </div>
+              <div>
+                <label>Distribución</label>
+                <select
+                  value={editingSettings.layout}
+                  onChange={(e) => {
+                    setEditingSettings((s) => ({
+                      ...s,
+                      layout: e.target.value as "qwerty" | "abc",
+                    }));
+                    handleSave();
+                  }}
                   className={`w-full p-2 rounded ${
-                    st.theme === "dark"
+                    editingSettings.theme === "dark"
                       ? "bg-gray-700"
-                      : st.theme === "high-contrast"
+                      : editingSettings.theme === "high-contrast"
                       ? "bg-black border border-yellow-300"
                       : "bg-white"
                   }`}
@@ -346,102 +313,11 @@ export default function VirtualKeyboard() {
                   <option value="abc">ABC</option>
                 </select>
               </div>
-              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
-                <label>
-                  {st.maintainLayout ? "Zoom (%)" : "Número de filas"}
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={st.maintainLayout ? "25" : "1"}
-                    max={st.maintainLayout ? "200" : "26"}
-                    step="1"
-                    value={st.numRows}
-                    onChange={(e) =>
-                      setSt((s) => ({
-                        ...s,
-                        numRows: parseInt(e.target.value),
-                      }))
-                    }
-                    className="flex-1"
-                  />
-                  <span className="w-16 text-center">
-                    {st.maintainLayout ? `${st.numRows}%` : st.numRows}
-                  </span>
-                </div>
-              </div>
-              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
-                <label>Espaciado</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="0"
-                    max="4"
-                    step="1"
-                    value={st.spacing}
-                    onChange={(e) =>
-                      setSt((s) => ({
-                        ...s,
-                        spacing: parseInt(e.target.value),
-                      }))
-                    }
-                    className="flex-1"
-                  />
-                  <span className="w-16 text-center">{st.spacing}</span>
-                </div>
-              </div>
-            </div>
-          );
-        case "text":
-          return (
-            <div className="space-y-4">
-              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
-                <label>Tamaño de texto del teclado (%)</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="1"
-                    max="95"
-                    step="1"
-                    value={st.fontSize}
-                    onChange={(e) =>
-                      setSt((s) => ({
-                        ...s,
-                        fontSize: parseFloat(e.target.value),
-                      }))
-                    }
-                    className="flex-1"
-                  />
-                  <span className="w-16 text-center">{st.fontSize}%</span>
-                </div>
-              </div>
-              <div className="p-3 rounded-lg bg-opacity-10 bg-gray-500">
-                <label>Tamaño de texto del área (px)</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="8"
-                    max="142"
-                    step="2"
-                    value={st.textareaFontSize}
-                    onChange={(e) =>
-                      setSt((s) => ({
-                        ...s,
-                        textareaFontSize: parseFloat(e.target.value),
-                      }))
-                    }
-                    className="flex-1"
-                  />
-                  <span className="w-16 text-center">
-                    {st.textareaFontSize}px
-                  </span>
-                </div>
-              </div>
-            </div>
+            </>
           );
         case "presets":
           return (
-            <div className="space-y-4">
+            <>
               <div className="flex gap-2 mb-4">
                 <input
                   type="text"
@@ -453,7 +329,7 @@ export default function VirtualKeyboard() {
                 <button
                   onClick={() => {
                     if (pName.trim()) {
-                      savePreset(pName.trim(), st);
+                      savePreset(pName.trim(), editingSettings);
                       setPrs(loadPresets());
                       setPName("");
                     }
@@ -463,7 +339,7 @@ export default function VirtualKeyboard() {
                   Guardar
                 </button>
               </div>
-              <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+              <div className="space-y-2">
                 {prs.map((p) => (
                   <div
                     key={p.name}
@@ -490,7 +366,24 @@ export default function VirtualKeyboard() {
                   </div>
                 ))}
               </div>
-            </div>
+              <div className="mt-6 pt-4 border-t">
+                <button
+                  onClick={() => {
+                    setEditingSettings(DEFAULT);
+                    localStorage.removeItem("keyboardSettings");
+                  }}
+                  className={`w-full px-4 py-2 rounded ${
+                    editingSettings.theme === "dark"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : editingSettings.theme === "high-contrast"
+                      ? "bg-red-500 text-black hover:bg-red-600"
+                      : "bg-red-500 hover:bg-red-600"
+                  } text-white font-semibold`}
+                >
+                  Restablecer
+                </button>
+              </div>
+            </>
           );
       }
     };
@@ -505,9 +398,9 @@ export default function VirtualKeyboard() {
       >
         <div
           className={`relative w-full max-w-md max-h-[90vh] flex flex-col rounded-xl shadow-lg ${
-            st.theme === "dark"
+            editingSettings.theme === "dark"
               ? "bg-gray-800"
-              : st.theme === "high-contrast"
+              : editingSettings.theme === "high-contrast"
               ? "bg-black border-2 border-yellow-300"
               : "bg-white"
           }`}
@@ -522,32 +415,23 @@ export default function VirtualKeyboard() {
               <X className="w-6 h-6" />
             </button>
           </div>
-
-          <div className="flex border-b px-4">
-            <TabButton tab="general" label="General" />
-            <TabButton tab="layout" label="Teclado" />
-            <TabButton tab="text" label="Texto" />
-            <TabButton tab="presets" label="Presets" />
+          <div className="flex border-b bg-inherit">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveSettingsTab(tab.id)}
+                className={`flex-1 px-4 py-2 text-center transition-colors ${
+                  activeSettingsTab === tab.id
+                    ? "border-b-2 border-blue-500 font-semibold"
+                    : "hover:bg-opacity-10 hover:bg-black"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-
-          <div className="flex-1 overflow-y-auto p-4">{renderTabContent()}</div>
-
-          <div className="p-4 border-t">
-            <button
-              onClick={() => {
-                setSt(DEFAULT);
-                localStorage.removeItem("keyboardSettings");
-              }}
-              className={`w-full px-4 py-2 rounded ${
-                st.theme === "dark"
-                  ? "bg-red-600 hover:bg-red-700"
-                  : st.theme === "high-contrast"
-                  ? "bg-red-500 text-black hover:bg-red-600"
-                  : "bg-red-500 hover:bg-red-600"
-              } text-white font-semibold`}
-            >
-              Restablecer
-            </button>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {renderTabContent()}
           </div>
         </div>
       </div>
@@ -706,7 +590,7 @@ export default function VirtualKeyboard() {
           >
             {layout.map((row, r) => (
               <div key={r} className="flex justify-center mb-2">
-                {row.map((k) => (
+                {row.map((k, i) => (
                   <button
                     key={k}
                     aria-label={ariaLabel(k)}
@@ -723,24 +607,37 @@ export default function VirtualKeyboard() {
                     }}
                     className={`${themeClasses(st.theme)} mx-${
                       st.spacing
-                    } rounded-lg font-semibold flex items-center justify-center
+                    } rounded-lg font-semibold select-none
                     ${
                       actK === k
                         ? "scale-95 border-blue-500 shadow-lg"
                         : "border-transparent"
                     }`}
                     style={{
-                      width: keySize() + "px",
+                      width:
+                        r === layout.length - 1
+                          ? k === "␣"
+                            ? keySize() * 7.5 // 75% para la barra espaciadora
+                            : keySize() * 2.5 // 25% para el botón borrar
+                          : keySize(),
                       height: keySize() + "px",
                       fontSize: (keySize() * st.fontSize) / 100 + "px",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      textAlign: "center",
-                      lineHeight: 1,
+                      padding: "0",
+                      margin: `0 ${st.spacing * 4}px`,
+                      userSelect: "none",
+                      touchAction: "none",
+                      lineHeight: "0",
+                      verticalAlign: "middle",
                     }}
                   >
-                    {k}
+                    {k === "␣" ? (
+                      <div className="w-1/2 h-1 bg-current rounded-full" />
+                    ) : (
+                      k
+                    )}
                   </button>
                 ))}
               </div>
