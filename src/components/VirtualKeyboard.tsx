@@ -16,6 +16,8 @@ interface KeyTimer {
 interface KeyboardSettings {
   holdTime: number;
   soundEnabled: boolean;
+  vibrationEnabled: boolean;
+  instantInput: boolean;
   theme: "light" | "dark" | "high-contrast";
   fontSize: number; // Percentage of key size (1-100)
   textareaFontSize: number; // In pixels (8-142)
@@ -31,6 +33,8 @@ interface Preset {
 const DEFAULT: KeyboardSettings = {
   holdTime: 0.1,
   soundEnabled: true,
+  vibrationEnabled: true,
+  instantInput: false,
   theme: "light",
   fontSize: 50,
   textareaFontSize: 16,
@@ -40,14 +44,14 @@ const DEFAULT: KeyboardSettings = {
 const LAYOUTS = {
   qwerty: [
     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-    ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+    ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"],
     ["Z", "X", "C", "V", "B", "N", "M"],
     ["␣", "⌫"],
   ],
   abc: [
     ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
-    ["J", "K", "L", "M", "N", "O", "P", "Q", "R"],
-    ["S", "T", "U", "V", "W", "X", "Y", "Z"],
+    ["J", "K", "L", "M", "N", "Ñ", "O", "P", "Q"],
+    ["R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
     ["␣", "⌫"],
   ],
 };
@@ -121,18 +125,39 @@ export default function VirtualKeyboard() {
     if (kRef.current[k]?.timeout) return;
     setActK(k);
     kRef.current[k] = { startTime: Date.now() };
+
+    if (st.instantInput) {
+      if (st.soundEnabled) {
+        new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
+        ).play();
+      }
+      if (st.vibrationEnabled && navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      if (k === "⌫") setInp((p) => p.slice(0, -1));
+      else if (k === "␣") setInp((p) => p + " ");
+      else setInp((p) => p + k);
+      setFlash(true);
+      setTimeout(() => setFlash(false), 150);
+    }
   };
+
   const up = (k: string) => {
     const kt = kRef.current[k];
     if (!kt?.startTime) return;
     setActK(null);
     const dur = (Date.now() - kt.startTime) / 1e3;
     delete kRef.current[k];
-    if (dur >= st.holdTime) {
-      if (st.soundEnabled)
+    if (!st.instantInput && dur >= st.holdTime) {
+      if (st.soundEnabled) {
         new Audio(
           "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
         ).play();
+      }
+      if (st.vibrationEnabled && navigator.vibrate) {
+        navigator.vibrate(50);
+      }
       if (k === "⌫") setInp((p) => p.slice(0, -1));
       else if (k === "␣") setInp((p) => p + " ");
       else setInp((p) => p + k);
@@ -221,6 +246,7 @@ export default function VirtualKeyboard() {
                   onMouseUp={handleSave}
                   onTouchEnd={handleSave}
                   className="w-full"
+                  disabled={editingSettings.instantInput}
                 />
                 <span>{editingSettings.holdTime}s</span>
               </div>
@@ -241,6 +267,46 @@ export default function VirtualKeyboard() {
                   }`}
                 >
                   {editingSettings.soundEnabled ? "Activado" : "Desactivado"}
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <label>Vibración</label>
+                <button
+                  onClick={() => {
+                    setEditingSettings((s) => ({
+                      ...s,
+                      vibrationEnabled: !s.vibrationEnabled,
+                    }));
+                    handleSave();
+                  }}
+                  className={`px-4 py-2 rounded ${
+                    editingSettings.vibrationEnabled
+                      ? "bg-green-500"
+                      : "bg-gray-500"
+                  }`}
+                >
+                  {editingSettings.vibrationEnabled
+                    ? "Activada"
+                    : "Desactivada"}
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <label>Input Instantáneo</label>
+                <button
+                  onClick={() => {
+                    setEditingSettings((s) => ({
+                      ...s,
+                      instantInput: !s.instantInput,
+                    }));
+                    handleSave();
+                  }}
+                  className={`px-4 py-2 rounded ${
+                    editingSettings.instantInput
+                      ? "bg-green-500"
+                      : "bg-gray-500"
+                  }`}
+                >
+                  {editingSettings.instantInput ? "Activado" : "Desactivado"}
                 </button>
               </div>
             </>
@@ -541,21 +607,18 @@ export default function VirtualKeyboard() {
                     : "bg-white border-gray-300 text-gray-900"
                 }`}
                 style={{
-                  minHeight: `${Math.max(1, st.textareaFontSize)}px`,
-                  maxHeight: "20vh",
+                  height: `${st.textareaFontSize * 1.5}px`,
                   resize: "none",
                   fontSize: `${st.textareaFontSize}px`,
                   overflow: "hidden",
+                  whiteSpace: "nowrap",
                   lineHeight: "1.2",
                 }}
                 onInput={(e) => {
                   const t = e.currentTarget;
-                  t.style.height = "auto";
-                  const nh = Math.min(t.scrollHeight, window.innerHeight * 0.2);
-                  t.style.height = `${nh}px`;
                   document.documentElement.style.setProperty(
                     "--text-area-height",
-                    `${nh + 32}px`
+                    `${st.textareaFontSize * 2}px`
                   );
                 }}
               />
