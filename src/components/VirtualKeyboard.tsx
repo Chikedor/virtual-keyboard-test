@@ -23,6 +23,7 @@ interface KeyboardSettings {
   textareaFontSize: number; // In pixels (8-142)
   spacing: number;
   layout: "qwerty" | "abc";
+  specialKeysPosition: "bottom" | "sides";
 }
 interface Preset {
   name: string;
@@ -40,20 +41,35 @@ const DEFAULT: KeyboardSettings = {
   textareaFontSize: 16,
   spacing: 2,
   layout: "qwerty",
+  specialKeysPosition: "bottom",
 };
 const LAYOUTS = {
-  qwerty: [
-    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-    ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"],
-    ["Z", "X", "C", "V", "B", "N", "M"],
-    ["␣", "⌫"],
-  ],
-  abc: [
-    ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
-    ["J", "K", "L", "M", "N", "Ñ", "O", "P", "Q"],
-    ["R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
-    ["␣", "⌫"],
-  ],
+  qwerty: {
+    bottom: [
+      ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+      ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"],
+      ["Z", "X", "C", "V", "B", "N", "M"],
+      ["␣", "⌫"],
+    ],
+    sides: [
+      ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+      ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"],
+      ["⌫", "Z", "X", "C", "V", "B", "N", "M", "␣"],
+    ],
+  },
+  abc: {
+    bottom: [
+      ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
+      ["J", "K", "L", "M", "N", "Ñ", "O", "P", "Q"],
+      ["R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
+      ["␣", "⌫"],
+    ],
+    sides: [
+      ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
+      ["J", "K", "L", "M", "N", "Ñ", "O", "P", "Q"],
+      ["⌫", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "␣"],
+    ],
+  },
 };
 
 // Funciones de Storage
@@ -81,10 +97,10 @@ const deletePreset = (name: string) => {
 // Helpers
 const themeClasses = (t: string) => {
   if (t === "dark")
-    return "bg-gray-700 hover:bg-gray-600 text-gray-100 border-2 flex items-center justify-center";
+    return "bg-gray-700 hover:bg-gray-600 text-gray-100 border-2 flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
   if (t === "high-contrast")
-    return "bg-yellow-300 hover:bg-yellow-400 text-black border-2 flex items-center justify-center";
-  return "bg-white hover:bg-gray-100 text-gray-900 border-2 flex items-center justify-center";
+    return "bg-yellow-300 hover:bg-yellow-400 text-black border-2 flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
+  return "bg-white hover:bg-gray-100 text-gray-900 border-2 flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
 };
 const ariaLabel = (k: string) =>
   k === "␣" ? "Tecla espacio" : k === "⌫" ? "Tecla borrar" : `Tecla ${k}`;
@@ -109,8 +125,8 @@ export default function VirtualKeyboard() {
 
   // Layout calculado
   const calcLayout = useCallback(() => {
-    return LAYOUTS[st.layout];
-  }, [st.layout]);
+    return LAYOUTS[st.layout][st.specialKeysPosition];
+  }, [st.layout, st.specialKeysPosition]);
 
   const [layout, setLayout] = useState<string[][]>([]);
   useEffect(() => {
@@ -118,7 +134,7 @@ export default function VirtualKeyboard() {
     ul();
     window.addEventListener("resize", ul);
     return () => window.removeEventListener("resize", ul);
-  }, [calcLayout]);
+  }, [calcLayout, st.layout, st.specialKeysPosition]);
 
   // Disparo de tecla
   const down = (k: string) => {
@@ -185,7 +201,7 @@ export default function VirtualKeyboard() {
     const availableHeight =
       window.innerHeight - headerHeight - textAreaHeight - 32; // 32px de padding total
 
-    const currentLayout = layout || LAYOUTS[st.layout];
+    const currentLayout = layout || LAYOUTS[st.layout][st.specialKeysPosition];
     const numRows = currentLayout.length;
     const maxKeysInRow = Math.max(...currentLayout.map((row) => row.length));
 
@@ -260,10 +276,10 @@ export default function VirtualKeyboard() {
                     }));
                     handleSave();
                   }}
-                  className={`px-4 py-2 rounded ${
+                  className={`px-4 py-2 rounded transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-md ${
                     editingSettings.soundEnabled
-                      ? "bg-green-500"
-                      : "bg-gray-500"
+                      ? "bg-green-500 hover:bg-green-600"
+                      : "bg-gray-500 hover:bg-gray-600"
                   }`}
                 >
                   {editingSettings.soundEnabled ? "Activado" : "Desactivado"}
@@ -279,10 +295,10 @@ export default function VirtualKeyboard() {
                     }));
                     handleSave();
                   }}
-                  className={`px-4 py-2 rounded ${
+                  className={`px-4 py-2 rounded transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-md ${
                     editingSettings.vibrationEnabled
-                      ? "bg-green-500"
-                      : "bg-gray-500"
+                      ? "bg-green-500 hover:bg-green-600"
+                      : "bg-gray-500 hover:bg-gray-600"
                   }`}
                 >
                   {editingSettings.vibrationEnabled
@@ -300,10 +316,10 @@ export default function VirtualKeyboard() {
                     }));
                     handleSave();
                   }}
-                  className={`px-4 py-2 rounded ${
+                  className={`px-4 py-2 rounded transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-md ${
                     editingSettings.instantInput
-                      ? "bg-green-500"
-                      : "bg-gray-500"
+                      ? "bg-green-500 hover:bg-green-600"
+                      : "bg-gray-500 hover:bg-gray-600"
                   }`}
                 >
                   {editingSettings.instantInput ? "Activado" : "Desactivado"}
@@ -377,6 +393,29 @@ export default function VirtualKeyboard() {
                 >
                   <option value="qwerty">QWERTY</option>
                   <option value="abc">ABC</option>
+                </select>
+              </div>
+              <div>
+                <label>Posición teclas especiales</label>
+                <select
+                  value={editingSettings.specialKeysPosition}
+                  onChange={(e) => {
+                    setEditingSettings((s) => ({
+                      ...s,
+                      specialKeysPosition: e.target.value as "bottom" | "sides",
+                    }));
+                    handleSave();
+                  }}
+                  className={`w-full p-2 rounded ${
+                    editingSettings.theme === "dark"
+                      ? "bg-gray-700"
+                      : editingSettings.theme === "high-contrast"
+                      ? "bg-black border border-yellow-300"
+                      : "bg-white"
+                  }`}
+                >
+                  <option value="bottom">Abajo (75/25)</option>
+                  <option value="sides">A los lados</option>
                 </select>
               </div>
             </>
@@ -457,13 +496,15 @@ export default function VirtualKeyboard() {
     return (
       <div
         className={`fixed inset-0 bg-black bg-opacity-50 z-30 ${
-          showSet ? "flex" : "hidden"
-        } items-center justify-center p-4 overflow-y-auto`}
+          showSet ? "flex opacity-100" : "hidden opacity-0"
+        } items-center justify-center p-4 overflow-y-auto transition-opacity duration-300 ease-in-out`}
         role="dialog"
         aria-modal="true"
       >
         <div
-          className={`relative w-full max-w-md max-h-[90vh] flex flex-col rounded-xl shadow-lg ${
+          className={`relative w-full max-w-md max-h-[90vh] flex flex-col rounded-xl shadow-lg transform transition-all duration-300 ease-in-out ${
+            showSet ? "scale-100 opacity-100" : "scale-95 opacity-0"
+          } ${
             editingSettings.theme === "dark"
               ? "bg-gray-800"
               : editingSettings.theme === "high-contrast"
@@ -508,17 +549,6 @@ export default function VirtualKeyboard() {
   return (
     <>
       <div
-        className={`fixed inset-0 pointer-events-none z-50 transition-opacity duration-150 ${
-          flash ? "opacity-30" : "opacity-0"
-        } ${
-          st.theme === "dark"
-            ? "bg-gray-300"
-            : st.theme === "high-contrast"
-            ? "bg-yellow-300"
-            : "bg-white"
-        }`}
-      />
-      <div
         className={`min-h-screen relative ${
           st.theme === "dark"
             ? "bg-gray-900 text-gray-100"
@@ -547,7 +577,7 @@ export default function VirtualKeyboard() {
                 {showTA ? "Ocultar Texto" : "Mostrar Texto"}
               </button>
               <div
-                className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap ${
+                className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap relative ${
                   st.theme === "dark"
                     ? "bg-gray-800"
                     : st.theme === "high-contrast"
@@ -563,6 +593,11 @@ export default function VirtualKeyboard() {
                 }}
               >
                 <span className="inline-block min-w-[1ch]">{inp || " "}</span>
+                <div
+                  className={`absolute inset-0 bg-current transition-opacity duration-150 pointer-events-none ${
+                    flash ? "opacity-30" : "opacity-0"
+                  }`}
+                />
               </div>
             </div>
             <div className="flex gap-4 ml-4" role="toolbar">
@@ -589,8 +624,8 @@ export default function VirtualKeyboard() {
             </div>
           </div>
           <div
-            className={`transition-all duration-300 overflow-hidden ${
-              showTA ? "max-h-[60vh]" : "max-h-0"
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${
+              showTA ? "max-h-[60vh] opacity-100" : "max-h-0 opacity-0"
             }`}
           >
             <div className="p-4">
@@ -599,7 +634,7 @@ export default function VirtualKeyboard() {
                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
                   setInp(e.target.value)
                 }
-                className={`w-full p-2 rounded-lg border-2 ${
+                className={`w-full p-2 rounded-lg border-2 relative ${
                   st.theme === "dark"
                     ? "bg-gray-800 border-gray-600 text-gray-100"
                     : st.theme === "high-contrast"
@@ -621,6 +656,11 @@ export default function VirtualKeyboard() {
                     `${st.textareaFontSize * 2}px`
                   );
                 }}
+              />
+              <div
+                className={`absolute inset-0 bg-current transition-opacity duration-150 pointer-events-none ${
+                  flash ? "opacity-30" : "opacity-0"
+                }`}
               />
             </div>
           </div>
@@ -673,15 +713,19 @@ export default function VirtualKeyboard() {
                     } rounded-lg font-semibold select-none
                     ${
                       actK === k
-                        ? "scale-95 border-blue-500 shadow-lg"
-                        : "border-transparent"
+                        ? "scale-95 border-blue-500 shadow-lg transform -translate-y-0 transition-transform duration-75"
+                        : "border-transparent transform transition-all duration-150 ease-out"
                     }`}
                     style={{
                       width:
-                        r === layout.length - 1
+                        r === layout.length - 1 &&
+                        st.specialKeysPosition === "bottom"
                           ? k === "␣"
                             ? keySize() * 7.5 // 75% para la barra espaciadora
                             : keySize() * 2.5 // 25% para el botón borrar
+                          : (k === "␣" || k === "⌫") &&
+                            st.specialKeysPosition === "sides"
+                          ? keySize() * 2 // Doble ancho para teclas especiales en los lados
                           : keySize(),
                       height: keySize() + "px",
                       fontSize: (keySize() * st.fontSize) / 100 + "px",
