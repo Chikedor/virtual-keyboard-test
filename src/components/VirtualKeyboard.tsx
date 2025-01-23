@@ -6,7 +6,15 @@ import React, {
   TouchEvent,
   ChangeEvent,
 } from "react";
-import { Volume2, VolumeX, Sun, Moon, Settings, X } from "lucide-react";
+import {
+  Volume2,
+  VolumeX,
+  Sun,
+  Moon,
+  Settings,
+  X,
+  Maximize,
+} from "lucide-react";
 
 // Interfaces
 interface KeyTimer {
@@ -54,7 +62,7 @@ const LAYOUTS = {
     sides: [
       ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
       ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"],
-      ["⌫", "Z", "X", "C", "V", "B", "N", "M", "␣"],
+      ["␣", "Z", "X", "C", "V", "B", "N", "M", "⌫"],
     ],
   },
   abc: {
@@ -67,7 +75,7 @@ const LAYOUTS = {
     sides: [
       ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
       ["J", "K", "L", "M", "N", "Ñ", "O", "P", "Q"],
-      ["⌫", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "␣"],
+      ["␣", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "⌫"],
     ],
   },
 };
@@ -97,13 +105,68 @@ const deletePreset = (name: string) => {
 // Helpers
 const themeClasses = (t: string) => {
   if (t === "dark")
-    return "bg-gray-700 hover:bg-gray-600 text-gray-100 border-2 flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
+    return "bg-gray-700 hover:bg-gray-600 text-gray-100 border-2 border-gray-600 shadow-inner flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
   if (t === "high-contrast")
-    return "bg-yellow-300 hover:bg-yellow-400 text-black border-2 flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
-  return "bg-white hover:bg-gray-100 text-gray-900 border-2 flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
+    return "bg-yellow-300 hover:bg-yellow-400 text-black border-2 border-yellow-400 shadow-inner flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
+  return "bg-white hover:bg-gray-50 text-gray-900 border-2 border-gray-200 shadow-sm flex items-center justify-center transition-all duration-150 ease-in-out hover:shadow-lg hover:-translate-y-0.5";
 };
 const ariaLabel = (k: string) =>
   k === "␣" ? "Tecla espacio" : k === "⌫" ? "Tecla borrar" : `Tecla ${k}`;
+
+// Utility functions
+const useAudio = (url: string) => {
+  const audio = useRef(new Audio(url));
+  return useCallback(() => {
+    audio.current.currentTime = 0;
+    audio.current.play().catch(() => {});
+  }, []);
+};
+
+const useVibration = (duration: number = 50) => {
+  return useCallback(() => {
+    if ("vibrate" in navigator) {
+      navigator.vibrate(duration);
+    }
+  }, [duration]);
+};
+
+const useFullscreen = (elementRef: React.RefObject<HTMLElement>) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) {
+      await elementRef.current?.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      await document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, [elementRef]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  return { isFullscreen, toggleFullscreen };
+};
+
+// Añadir al inicio del archivo, después de los imports
+const FlashOverlay = ({ active }: { active: boolean }) => (
+  <div
+    className={`absolute inset-0 transition-opacity duration-200 pointer-events-none bg-gradient-to-r from-transparent via-current to-transparent ${
+      active ? "opacity-20" : "opacity-0"
+    }`}
+    style={{
+      mixBlendMode: "overlay",
+    }}
+  />
+);
 
 // Componente principal
 export default function VirtualKeyboard() {
@@ -117,6 +180,11 @@ export default function VirtualKeyboard() {
   const [activeSettingsTab, setActiveSettingsTab] = useState("general");
   const kRef = useRef<{ [k: string]: KeyTimer }>({});
   const contRef = useRef<HTMLDivElement | null>(null);
+  const playKeySound = useAudio(
+    "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
+  );
+  const triggerVibration = useVibration(50);
+  const { isFullscreen, toggleFullscreen } = useFullscreen(contRef);
 
   // Guardado
   useEffect(() => {
@@ -143,14 +211,8 @@ export default function VirtualKeyboard() {
     kRef.current[k] = { startTime: Date.now() };
 
     if (st.instantInput) {
-      if (st.soundEnabled) {
-        new Audio(
-          "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
-        ).play();
-      }
-      if (st.vibrationEnabled && navigator.vibrate) {
-        navigator.vibrate(50);
-      }
+      playKeySound();
+      triggerVibration();
       if (k === "⌫") setInp((p) => p.slice(0, -1));
       else if (k === "␣") setInp((p) => p + " ");
       else setInp((p) => p + k);
@@ -166,14 +228,8 @@ export default function VirtualKeyboard() {
     const dur = (Date.now() - kt.startTime) / 1e3;
     delete kRef.current[k];
     if (!st.instantInput && dur >= st.holdTime) {
-      if (st.soundEnabled) {
-        new Audio(
-          "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
-        ).play();
-      }
-      if (st.vibrationEnabled && navigator.vibrate) {
-        navigator.vibrate(50);
-      }
+      playKeySound();
+      triggerVibration();
       if (k === "⌫") setInp((p) => p.slice(0, -1));
       else if (k === "␣") setInp((p) => p + " ");
       else setInp((p) => p + k);
@@ -186,34 +242,44 @@ export default function VirtualKeyboard() {
   const keySize = () => {
     if (!contRef.current) return 60;
 
-    const containerWidth = contRef.current.offsetWidth - 32; // 32px de padding total
-    const headerHeight = 64; // 4rem para el header
-    const textAreaHeight = showTA
-      ? parseInt(
-          getComputedStyle(document.documentElement).getPropertyValue(
-            "--text-area-height"
-          ) || "0",
-          10
-        )
-      : 0;
+    const containerWidth = window.innerWidth - 16; // Reducido a 16px de padding total
+    const headerHeight = 56; // Reducido a 3.5rem
+    const textAreaHeight = showTA ? st.textareaFontSize * 1.5 : 0; // Reducido el multiplicador
+    const safeAreaBottom = parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue(
+        "--safe-area-inset-bottom"
+      ) || "8",
+      10
+    );
 
-    // Altura disponible total
+    // Altura disponible total (reducidos los márgenes)
     const availableHeight =
-      window.innerHeight - headerHeight - textAreaHeight - 32; // 32px de padding total
+      window.innerHeight - headerHeight - textAreaHeight - 16 - safeAreaBottom;
 
     const currentLayout = layout || LAYOUTS[st.layout][st.specialKeysPosition];
     const numRows = currentLayout.length;
     const maxKeysInRow = Math.max(...currentLayout.map((row) => row.length));
 
-    // Calcular tamaño basado en el espacio disponible
+    // Calcular tamaño basado en el espacio disponible (reducido el espaciado)
     const keyWidth =
-      (containerWidth - (maxKeysInRow - 1) * st.spacing * 2) / maxKeysInRow;
+      (containerWidth - (maxKeysInRow - 1) * st.spacing * 4) / maxKeysInRow;
     const keyHeight =
-      (availableHeight - (numRows - 1) * st.spacing * 2) / numRows;
+      (availableHeight - (numRows - 1) * st.spacing * 4) / numRows;
 
-    // Usar el menor valor para mantener teclas cuadradas, pero no menos de 40px
-    return Math.max(Math.min(keyWidth, keyHeight) * 0.95, 40);
+    // Usar el menor valor para mantener teclas cuadradas, pero no menos de 36px
+    return Math.max(
+      Math.min(keyWidth, keyHeight, availableHeight / numRows) * 0.98,
+      36
+    );
   };
+
+  // Actualizar el tamaño cuando cambia el textarea
+  useEffect(() => {
+    const updateLayout = () => setLayout(calcLayout());
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, [calcLayout, showTA, st.textareaFontSize]);
 
   const SettingPanel = () => {
     const [pName, setPName] = useState("");
@@ -337,7 +403,7 @@ export default function VirtualKeyboard() {
                 <input
                   type="range"
                   min="1"
-                  max="95"
+                  max="100"
                   step="1"
                   value={editingSettings.fontSize}
                   onChange={(e) =>
@@ -547,152 +613,163 @@ export default function VirtualKeyboard() {
 
   // Render
   return (
-    <>
-      <div
-        className={`min-h-screen relative ${
-          st.theme === "dark"
-            ? "bg-gray-900 text-gray-100"
-            : st.theme === "high-contrast"
-            ? "bg-black text-yellow-300"
-            : "bg-gray-100 text-gray-900"
-        }`}
-        role="application"
-      >
-        <div className="fixed top-0 left-0 right-0 bg-inherit z-20 shadow-lg">
-          <div className="flex justify-between items-center p-4">
-            <div className="flex items-center gap-4 flex-1">
-              <h1 className="text-2xl font-bold">Teclado Accesible</h1>
-              <button
-                onClick={() => {
-                  setShowTA(!showTA);
-                }}
-                className={`px-3 py-1 rounded-lg ${
-                  st.theme === "dark"
-                    ? "bg-gray-700 hover:bg-gray-600"
-                    : st.theme === "high-contrast"
-                    ? "bg-yellow-300 hover:bg-yellow-400 text-black"
-                    : "bg-white hover:bg-gray-100"
-                }`}
-              >
-                {showTA ? "Ocultar Texto" : "Mostrar Texto"}
-              </button>
-              <div
-                className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap relative ${
-                  st.theme === "dark"
-                    ? "bg-gray-800"
-                    : st.theme === "high-contrast"
-                    ? "bg-black border border-yellow-300"
-                    : "bg-gray-200"
-                }`}
-                style={{
-                  minWidth: "50px",
-                  maxWidth: "calc(100% - 300px)",
-                  minHeight: "2.5rem",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-              >
-                <span className="inline-block min-w-[1ch]">{inp || " "}</span>
-                <div
-                  className={`absolute inset-0 bg-current transition-opacity duration-150 pointer-events-none ${
-                    flash ? "opacity-30" : "opacity-0"
-                  }`}
-                />
-              </div>
-            </div>
-            <div className="flex gap-4 ml-4" role="toolbar">
-              <button
-                onClick={() =>
-                  setSt((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
-                }
-              >
-                {st.soundEnabled ? <Volume2 /> : <VolumeX />}
-              </button>
-              <button
-                onClick={() =>
-                  setSt((s) => ({
-                    ...s,
-                    theme: s.theme === "light" ? "dark" : "light",
-                  }))
-                }
-              >
-                {st.theme === "light" ? <Moon /> : <Sun />}
-              </button>
-              <button onClick={() => setShowSet(true)}>
-                <Settings />
-              </button>
-            </div>
+    <div ref={contRef} className="h-screen flex flex-col bg-inherit">
+      {/* Header fijo */}
+      <header className="fixed top-0 left-0 right-0 bg-inherit z-20">
+        <div className="flex justify-between items-center p-4 border-b">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">Teclado Accesible</h1>
+            <button
+              onClick={() => setShowTA(!showTA)}
+              className={`px-3 py-1 rounded-lg ${
+                st.theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : st.theme === "high-contrast"
+                  ? "bg-yellow-300 hover:bg-yellow-400 text-black"
+                  : "bg-white hover:bg-gray-100"
+              }`}
+            >
+              {showTA ? "Ocultar Texto" : "Mostrar Texto"}
+            </button>
           </div>
-          <div
-            className={`transition-all duration-300 ease-in-out overflow-hidden ${
-              showTA ? "max-h-[60vh] opacity-100" : "max-h-0 opacity-0"
-            }`}
-          >
-            <div className="p-4">
-              <textarea
-                value={inp}
-                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                  setInp(e.target.value)
-                }
-                className={`w-full p-2 rounded-lg border-2 relative ${
-                  st.theme === "dark"
-                    ? "bg-gray-800 border-gray-600 text-gray-100"
-                    : st.theme === "high-contrast"
-                    ? "bg-black border-yellow-300 text-yellow-300"
-                    : "bg-white border-gray-300 text-gray-900"
-                }`}
-                style={{
-                  height: `${st.textareaFontSize * 1.5}px`,
-                  resize: "none",
-                  fontSize: `${st.textareaFontSize}px`,
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  lineHeight: "1.2",
-                }}
-                onInput={(e) => {
-                  const t = e.currentTarget;
-                  document.documentElement.style.setProperty(
-                    "--text-area-height",
-                    `${st.textareaFontSize * 2}px`
-                  );
-                }}
-              />
-              <div
-                className={`absolute inset-0 bg-current transition-opacity duration-150 pointer-events-none ${
-                  flash ? "opacity-30" : "opacity-0"
-                }`}
-              />
-            </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() =>
+                setSt((p) => ({ ...p, soundEnabled: !p.soundEnabled }))
+              }
+              className="p-2 rounded hover:bg-gray-100"
+              aria-label={
+                st.soundEnabled ? "Desactivar sonido" : "Activar sonido"
+              }
+            >
+              {st.soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
+            </button>
+            <button
+              onClick={() =>
+                setSt((p) => ({
+                  ...p,
+                  theme: p.theme === "light" ? "dark" : "light",
+                }))
+              }
+              className="p-2 rounded hover:bg-gray-100"
+              aria-label={
+                st.theme === "light"
+                  ? "Cambiar a tema oscuro"
+                  : "Cambiar a tema claro"
+              }
+            >
+              {st.theme === "light" ? <Moon size={24} /> : <Sun size={24} />}
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 rounded hover:bg-gray-100"
+              aria-label={
+                isFullscreen
+                  ? "Salir de pantalla completa"
+                  : "Pantalla completa"
+              }
+            >
+              <Maximize size={24} />
+            </button>
+            <button
+              onClick={() => setShowSet(true)}
+              className="p-2 rounded hover:bg-gray-100"
+              aria-label="Configuración"
+            >
+              <Settings size={24} />
+            </button>
           </div>
         </div>
 
-        <SettingPanel />
+        {/* Input display y Textarea intercambiables */}
+        <div className="p-4 relative h-16">
+          <div
+            className={`absolute inset-0 p-4 transition-all duration-300 ease-in-out ${
+              !showTA ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
+            }`}
+          >
+            <div
+              className={`w-full px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap relative ${
+                st.theme === "dark"
+                  ? "bg-gray-800"
+                  : st.theme === "high-contrast"
+                  ? "bg-black border border-yellow-300"
+                  : "bg-gray-200"
+              }`}
+              style={{
+                minHeight: "2.5rem",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <span className="inline-block min-w-[1ch]">{inp || " "}</span>
+              <FlashOverlay active={flash} />
+            </div>
+          </div>
+
+          <div
+            className={`absolute inset-0 p-4 transition-all duration-300 ease-in-out ${
+              showTA ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+            }`}
+          >
+            <textarea
+              value={inp}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                setInp(e.target.value)
+              }
+              readOnly
+              className={`w-full p-2 rounded-lg border-2 relative ${
+                st.theme === "dark"
+                  ? "bg-gray-800 border-gray-600 text-gray-100"
+                  : st.theme === "high-contrast"
+                  ? "bg-black border-yellow-300 text-yellow-300"
+                  : "bg-white border-gray-300 text-gray-900"
+              } focus:outline-none`}
+              style={{
+                height: `${st.textareaFontSize * 1.5}px`,
+                resize: "none",
+                fontSize: `${st.textareaFontSize}px`,
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                lineHeight: "1.2",
+                WebkitUserSelect: "none",
+                userSelect: "none",
+                position: "relative",
+              }}
+              onInput={(e) => {
+                document.documentElement.style.setProperty(
+                  "--text-area-height",
+                  `${st.textareaFontSize * 2}px`
+                );
+              }}
+            />
+            <FlashOverlay active={flash} />
+          </div>
+        </div>
+      </header>
+
+      {/* Spacer para el contenido bajo el header */}
+      <div
+        style={{
+          height: showTA ? "8rem" : "8rem",
+          transition: "height 300ms",
+        }}
+      />
+
+      {/* Teclado */}
+      <div className="flex-1 overflow-hidden">
         <div
+          className={`fixed left-0 right-0 bottom-0 p-4 bg-inherit ${
+            st.theme === "dark" ? "bg-gray-800" : "bg-gray-200"
+          }`}
           style={{
-            height: showTA
-              ? `calc(4rem + var(--text-area-height, 0px))`
-              : "4rem",
-            transition: "height 300ms",
-          }}
-        />
-        <div
-          className={`fixed left-0 right-0 bottom-0 overflow-y-auto bg-inherit select-none`}
-          style={{
-            top: showTA ? "calc(4rem + var(--text-area-height, 0px))" : "4rem",
-            transition: "top 300ms",
+            paddingBottom: "env(safe-area-inset-bottom, 16px)",
+            transition: "padding-bottom 300ms ease-in-out",
           }}
         >
-          <div
-            ref={contRef}
-            className={`fixed bottom-0 left-0 right-0 p-4 ${
-              st.theme === "dark" ? "bg-gray-800" : "bg-gray-200"
-            }`}
-            style={{
-              paddingBottom: "env(safe-area-inset-bottom, 16px)",
-            }}
-          >
+          <div className="flex flex-col gap-1">
             {layout.map((row, r) => (
-              <div key={r} className="flex justify-center mb-2">
+              <div key={r} className="flex justify-center gap-1">
                 {row.map((k, i) => (
                   <button
                     key={k}
@@ -711,33 +788,30 @@ export default function VirtualKeyboard() {
                     className={`${themeClasses(st.theme)} mx-${
                       st.spacing
                     } rounded-lg font-semibold select-none
-                    ${
-                      actK === k
-                        ? "scale-95 border-blue-500 shadow-lg transform -translate-y-0 transition-transform duration-75"
-                        : "border-transparent transform transition-all duration-150 ease-out"
-                    }`}
+                      ${
+                        actK === k
+                          ? "scale-[0.97] shadow-inner border-blue-500/50 transform -translate-y-0 transition-all duration-75"
+                          : "border-transparent transform transition-all duration-150 ease-out hover:shadow-md"
+                      }`}
                     style={{
                       width:
                         r === layout.length - 1 &&
                         st.specialKeysPosition === "bottom"
                           ? k === "␣"
-                            ? keySize() * 7.5 // 75% para la barra espaciadora
-                            : keySize() * 2.5 // 25% para el botón borrar
+                            ? `calc(${keySize() * 7.5}px)` // 75% para la barra espaciadora
+                            : `calc(${keySize() * 2.5}px)` // 25% para el botón borrar
                           : (k === "␣" || k === "⌫") &&
                             st.specialKeysPosition === "sides"
-                          ? keySize() * 2 // Doble ancho para teclas especiales en los lados
-                          : keySize(),
+                          ? `calc(${keySize() * 2}px)` // Doble ancho para teclas especiales en los lados
+                          : `${keySize()}px`,
                       height: keySize() + "px",
                       fontSize: (keySize() * st.fontSize) / 100 + "px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "0",
-                      margin: `0 ${st.spacing * 4}px`,
-                      userSelect: "none",
-                      touchAction: "none",
-                      lineHeight: "0",
-                      verticalAlign: "middle",
+                      margin: `0 ${st.spacing * 2}px`,
+                      borderRadius: "0.5rem",
+                      boxShadow:
+                        actK === k
+                          ? "inset 0 1px 2px rgba(0,0,0,0.1)"
+                          : "0 1px 2px rgba(0,0,0,0.1)",
                     }}
                   >
                     {k === "␣" ? (
@@ -752,6 +826,9 @@ export default function VirtualKeyboard() {
           </div>
         </div>
       </div>
-    </>
+
+      {/* Panel de configuración */}
+      <SettingPanel />
+    </div>
   );
 }
