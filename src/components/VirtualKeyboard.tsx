@@ -3,7 +3,6 @@ import React, {
   useEffect,
   useCallback,
   useRef,
-  TouchEvent,
   ChangeEvent,
 } from "react";
 import {
@@ -14,6 +13,7 @@ import {
   Settings,
   X,
   Maximize,
+  Play,
 } from "lucide-react";
 
 // Interfaces
@@ -32,6 +32,9 @@ interface KeyboardSettings {
   spacing: number;
   layout: "qwerty" | "abc";
   specialKeysPosition: "bottom" | "sides";
+  voiceRate: number; // Velocidad de la voz (0.1-3)
+  voiceVolume: number; // Volumen de la voz (0-1)
+  voicePitch: number; // Tono de la voz (0-2)
 }
 interface Preset {
   name: string;
@@ -50,7 +53,34 @@ const DEFAULT: KeyboardSettings = {
   spacing: 2,
   layout: "qwerty",
   specialKeysPosition: "bottom",
+  voiceRate: 2,
+  voiceVolume: 0.8,
+  voicePitch: 1,
 };
+
+const DEFAULT_PRESETS: Preset[] = [
+  {
+    name: "Configuración 100%",
+    settings: {
+      ...DEFAULT,
+      fontSize: 100,
+      textareaFontSize: 10,
+      layout: "qwerty",
+      specialKeysPosition: "bottom",
+    },
+  },
+  {
+    name: "QWERTY 75/25",
+    settings: {
+      ...DEFAULT,
+      fontSize: 75,
+      textareaFontSize: 25,
+      layout: "qwerty",
+      specialKeysPosition: "bottom",
+    },
+  },
+];
+
 const LAYOUTS = {
   qwerty: {
     bottom: [
@@ -91,7 +121,10 @@ const loadSettings = (): KeyboardSettings =>
     ? { ...DEFAULT, ...load("keyboardSettings") }
     : DEFAULT;
 const saveSettings = (s: KeyboardSettings) => save("keyboardSettings", s);
-const loadPresets = (): Preset[] => load("keyboardPresets") || [];
+const loadPresets = (): Preset[] => {
+  const savedPresets = load("keyboardPresets") || [];
+  return [...DEFAULT_PRESETS, ...savedPresets];
+};
 const savePreset = (name: string, set: KeyboardSettings) => {
   const p = loadPresets();
   p.push({ name, settings: set });
@@ -114,12 +147,39 @@ const ariaLabel = (k: string) =>
   k === "␣" ? "Tecla espacio" : k === "⌫" ? "Tecla borrar" : `Tecla ${k}`;
 
 // Utility functions
-const useAudio = (url: string) => {
-  const audio = useRef(new Audio(url));
-  return useCallback(() => {
-    audio.current.currentTime = 0;
-    audio.current.play().catch(() => {});
-  }, []);
+const useAudio = (settings: KeyboardSettings) => {
+  const synth = window.speechSynthesis;
+  const lastSpokenRef = useRef<{ [key: string]: number }>({});
+  const GRACE_PERIOD = 500; // 500ms de período de gracia
+
+  return useCallback(
+    (text: string, isSpecialKey: boolean = false) => {
+      if (!synth) return;
+
+      const now = Date.now();
+
+      // Si es una tecla especial, verificar el período de gracia
+      if (isSpecialKey) {
+        const lastSpoken = lastSpokenRef.current[text] || 0;
+        if (now - lastSpoken < GRACE_PERIOD) {
+          return; // No reproducir si no ha pasado suficiente tiempo
+        }
+        lastSpokenRef.current[text] = now;
+      }
+
+      // Cancelar cualquier pronunciación anterior
+      synth.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "es-ES";
+      utterance.rate = settings.voiceRate;
+      utterance.volume = settings.voiceVolume;
+      utterance.pitch = settings.voicePitch;
+
+      synth.speak(utterance);
+    },
+    [settings]
+  );
 };
 
 const useVibration = (duration: number = 50) => {
@@ -180,9 +240,7 @@ export default function VirtualKeyboard() {
   const [activeSettingsTab, setActiveSettingsTab] = useState("general");
   const kRef = useRef<{ [k: string]: KeyTimer }>({});
   const contRef = useRef<HTMLDivElement | null>(null);
-  const playKeySound = useAudio(
-    "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"
-  );
+  const speakKey = useAudio(st);
   const triggerVibration = useVibration(50);
   const { isFullscreen, toggleFullscreen } = useFullscreen(contRef);
 
@@ -211,7 +269,11 @@ export default function VirtualKeyboard() {
     kRef.current[k] = { startTime: Date.now() };
 
     if (st.instantInput) {
-      playKeySound();
+      if (st.soundEnabled) {
+        const textToSpeak = k === "␣" ? "espacio" : k === "⌫" ? "borrar" : k;
+        const isSpecialKey = k === "␣" || k === "⌫";
+        speakKey(textToSpeak, isSpecialKey);
+      }
       triggerVibration();
       if (k === "⌫") setInp((p) => p.slice(0, -1));
       else if (k === "␣") setInp((p) => p + " ");
@@ -228,7 +290,11 @@ export default function VirtualKeyboard() {
     const dur = (Date.now() - kt.startTime) / 1e3;
     delete kRef.current[k];
     if (!st.instantInput && dur >= st.holdTime) {
-      playKeySound();
+      if (st.soundEnabled) {
+        const textToSpeak = k === "␣" ? "espacio" : k === "⌫" ? "borrar" : k;
+        const isSpecialKey = k === "␣" || k === "⌫";
+        speakKey(textToSpeak, isSpecialKey);
+      }
       triggerVibration();
       if (k === "⌫") setInp((p) => p.slice(0, -1));
       else if (k === "␣") setInp((p) => p + " ");
@@ -281,6 +347,13 @@ export default function VirtualKeyboard() {
     return () => window.removeEventListener("resize", updateLayout);
   }, [calcLayout, showTA, st.textareaFontSize]);
 
+  // Función para leer texto completo
+  const readFullText = () => {
+    if (inp.trim() && st.soundEnabled) {
+      speakKey(inp.trim());
+    }
+  };
+
   const SettingPanel = () => {
     const [pName, setPName] = useState("");
     const [editingSettings, setEditingSettings] = useState(st);
@@ -289,15 +362,15 @@ export default function VirtualKeyboard() {
       setEditingSettings(st);
     }, [showSet]); // Reset cuando se abre el panel
 
-    const handleLoadPreset = (p: Preset) => {
-      setEditingSettings(p.settings);
-      setSt(p.settings);
-      saveSettings(p.settings);
+    const handleSettingChange = (changes: Partial<KeyboardSettings>) => {
+      const newSettings = { ...editingSettings, ...changes };
+      setEditingSettings(newSettings);
+      setSt(newSettings);
+      saveSettings(newSettings);
     };
 
-    const handleSave = () => {
-      setSt(editingSettings);
-      saveSettings(editingSettings);
+    const handleLoadPreset = (p: Preset) => {
+      handleSettingChange(p.settings);
     };
 
     const tabs = [
@@ -320,13 +393,10 @@ export default function VirtualKeyboard() {
                   step="0.1"
                   value={editingSettings.holdTime}
                   onChange={(e) =>
-                    setEditingSettings((s) => ({
-                      ...s,
+                    handleSettingChange({
                       holdTime: parseFloat(e.target.value),
-                    }))
+                    })
                   }
-                  onMouseUp={handleSave}
-                  onTouchEnd={handleSave}
                   className="w-full"
                   disabled={editingSettings.instantInput}
                 />
@@ -335,13 +405,11 @@ export default function VirtualKeyboard() {
               <div className="flex items-center justify-between">
                 <label>Sonido</label>
                 <button
-                  onClick={() => {
-                    setEditingSettings((s) => ({
-                      ...s,
-                      soundEnabled: !s.soundEnabled,
-                    }));
-                    handleSave();
-                  }}
+                  onClick={() =>
+                    handleSettingChange({
+                      soundEnabled: !editingSettings.soundEnabled,
+                    })
+                  }
                   className={`px-4 py-2 rounded transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-md ${
                     editingSettings.soundEnabled
                       ? "bg-green-500 hover:bg-green-600"
@@ -354,13 +422,11 @@ export default function VirtualKeyboard() {
               <div className="flex items-center justify-between">
                 <label>Vibración</label>
                 <button
-                  onClick={() => {
-                    setEditingSettings((s) => ({
-                      ...s,
-                      vibrationEnabled: !s.vibrationEnabled,
-                    }));
-                    handleSave();
-                  }}
+                  onClick={() =>
+                    handleSettingChange({
+                      vibrationEnabled: !editingSettings.vibrationEnabled,
+                    })
+                  }
                   className={`px-4 py-2 rounded transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-md ${
                     editingSettings.vibrationEnabled
                       ? "bg-green-500 hover:bg-green-600"
@@ -375,13 +441,11 @@ export default function VirtualKeyboard() {
               <div className="flex items-center justify-between">
                 <label>Input Instantáneo</label>
                 <button
-                  onClick={() => {
-                    setEditingSettings((s) => ({
-                      ...s,
-                      instantInput: !s.instantInput,
-                    }));
-                    handleSave();
-                  }}
+                  onClick={() =>
+                    handleSettingChange({
+                      instantInput: !editingSettings.instantInput,
+                    })
+                  }
                   className={`px-4 py-2 rounded transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-md ${
                     editingSettings.instantInput
                       ? "bg-green-500 hover:bg-green-600"
@@ -391,6 +455,65 @@ export default function VirtualKeyboard() {
                   {editingSettings.instantInput ? "Activado" : "Desactivado"}
                 </button>
               </div>
+              {editingSettings.soundEnabled && (
+                <>
+                  <div>
+                    <label>Velocidad de voz</label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="3"
+                      step="0.1"
+                      value={editingSettings.voiceRate}
+                      onChange={(e) =>
+                        handleSettingChange({
+                          voiceRate: parseFloat(e.target.value),
+                        })
+                      }
+                      className="w-full"
+                    />
+                    <span>{editingSettings.voiceRate}x</span>
+                  </div>
+
+                  <div>
+                    <label>Volumen de voz</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={editingSettings.voiceVolume}
+                      onChange={(e) =>
+                        handleSettingChange({
+                          voiceVolume: parseFloat(e.target.value),
+                        })
+                      }
+                      className="w-full"
+                    />
+                    <span>
+                      {Math.round(editingSettings.voiceVolume * 100)}%
+                    </span>
+                  </div>
+
+                  <div>
+                    <label>Tono de voz</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={editingSettings.voicePitch}
+                      onChange={(e) =>
+                        handleSettingChange({
+                          voicePitch: parseFloat(e.target.value),
+                        })
+                      }
+                      className="w-full"
+                    />
+                    <span>{editingSettings.voicePitch}</span>
+                  </div>
+                </>
+              )}
             </>
           );
         case "keyboard":
@@ -407,13 +530,10 @@ export default function VirtualKeyboard() {
                   step="1"
                   value={editingSettings.fontSize}
                   onChange={(e) =>
-                    setEditingSettings((s) => ({
-                      ...s,
+                    handleSettingChange({
                       fontSize: parseFloat(e.target.value),
-                    }))
+                    })
                   }
-                  onMouseUp={handleSave}
-                  onTouchEnd={handleSave}
                   className="w-full"
                 />
                 <span>{editingSettings.fontSize}%</span>
@@ -427,13 +547,10 @@ export default function VirtualKeyboard() {
                   step="2"
                   value={editingSettings.textareaFontSize}
                   onChange={(e) =>
-                    setEditingSettings((s) => ({
-                      ...s,
+                    handleSettingChange({
                       textareaFontSize: parseFloat(e.target.value),
-                    }))
+                    })
                   }
-                  onMouseUp={handleSave}
-                  onTouchEnd={handleSave}
                   className="w-full"
                 />
                 <span>{editingSettings.textareaFontSize}px</span>
@@ -442,13 +559,11 @@ export default function VirtualKeyboard() {
                 <label>Distribución</label>
                 <select
                   value={editingSettings.layout}
-                  onChange={(e) => {
-                    setEditingSettings((s) => ({
-                      ...s,
+                  onChange={(e) =>
+                    handleSettingChange({
                       layout: e.target.value as "qwerty" | "abc",
-                    }));
-                    handleSave();
-                  }}
+                    })
+                  }
                   className={`w-full p-2 rounded ${
                     editingSettings.theme === "dark"
                       ? "bg-gray-700"
@@ -465,13 +580,11 @@ export default function VirtualKeyboard() {
                 <label>Posición teclas especiales</label>
                 <select
                   value={editingSettings.specialKeysPosition}
-                  onChange={(e) => {
-                    setEditingSettings((s) => ({
-                      ...s,
+                  onChange={(e) =>
+                    handleSettingChange({
                       specialKeysPosition: e.target.value as "bottom" | "sides",
-                    }));
-                    handleSave();
-                  }}
+                    })
+                  }
                   className={`w-full p-2 rounded ${
                     editingSettings.theme === "dark"
                       ? "bg-gray-700"
@@ -539,10 +652,7 @@ export default function VirtualKeyboard() {
               </div>
               <div className="mt-6 pt-4 border-t">
                 <button
-                  onClick={() => {
-                    setEditingSettings(DEFAULT);
-                    localStorage.removeItem("keyboardSettings");
-                  }}
+                  onClick={() => handleSettingChange(DEFAULT)}
                   className={`w-full px-4 py-2 rounded ${
                     editingSettings.theme === "dark"
                       ? "bg-red-600 hover:bg-red-700"
@@ -688,22 +798,39 @@ export default function VirtualKeyboard() {
               !showTA ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
             }`}
           >
-            <div
-              className={`w-full px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap relative ${
-                st.theme === "dark"
-                  ? "bg-gray-800"
-                  : st.theme === "high-contrast"
-                  ? "bg-black border border-yellow-300"
-                  : "bg-gray-200"
-              }`}
-              style={{
-                minHeight: "2.5rem",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <span className="inline-block min-w-[1ch]">{inp || " "}</span>
-              <FlashOverlay active={flash} />
+            <div className="flex gap-2 items-center">
+              <div
+                className={`flex-1 px-4 py-2 rounded-lg overflow-x-auto whitespace-nowrap relative ${
+                  st.theme === "dark"
+                    ? "bg-gray-800"
+                    : st.theme === "high-contrast"
+                    ? "bg-black border border-yellow-300"
+                    : "bg-gray-200"
+                }`}
+                style={{
+                  minHeight: "2.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <span className="inline-block min-w-[1ch]">{inp || " "}</span>
+                <FlashOverlay active={flash} />
+              </div>
+              {st.soundEnabled && inp.trim() && (
+                <button
+                  onClick={readFullText}
+                  className={`p-2 rounded-lg ${
+                    st.theme === "dark"
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-100"
+                      : st.theme === "high-contrast"
+                      ? "bg-yellow-300 hover:bg-yellow-400 text-black"
+                      : "bg-white hover:bg-gray-100"
+                  }`}
+                  aria-label="Leer texto"
+                >
+                  <Play size={20} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -712,37 +839,54 @@ export default function VirtualKeyboard() {
               showTA ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
             }`}
           >
-            <textarea
-              value={inp}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                setInp(e.target.value)
-              }
-              readOnly
-              className={`w-full p-2 rounded-lg border-2 relative ${
-                st.theme === "dark"
-                  ? "bg-gray-800 border-gray-600 text-gray-100"
-                  : st.theme === "high-contrast"
-                  ? "bg-black border-yellow-300 text-yellow-300"
-                  : "bg-white border-gray-300 text-gray-900"
-              } focus:outline-none`}
-              style={{
-                height: `${st.textareaFontSize * 1.5}px`,
-                resize: "none",
-                fontSize: `${st.textareaFontSize}px`,
-                overflow: "hidden",
-                whiteSpace: "nowrap",
-                lineHeight: "1.2",
-                WebkitUserSelect: "none",
-                userSelect: "none",
-                position: "relative",
-              }}
-              onInput={(e) => {
-                document.documentElement.style.setProperty(
-                  "--text-area-height",
-                  `${st.textareaFontSize * 2}px`
-                );
-              }}
-            />
+            <div className="flex gap-2 items-center">
+              <textarea
+                value={inp}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  setInp(e.target.value)
+                }
+                readOnly
+                className={`flex-1 p-2 rounded-lg border-2 relative ${
+                  st.theme === "dark"
+                    ? "bg-gray-800 border-gray-600 text-gray-100"
+                    : st.theme === "high-contrast"
+                    ? "bg-black border-yellow-300 text-yellow-300"
+                    : "bg-white border-gray-300 text-gray-900"
+                } focus:outline-none`}
+                style={{
+                  height: `${st.textareaFontSize * 1.5}px`,
+                  resize: "none",
+                  fontSize: `${st.textareaFontSize}px`,
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  lineHeight: "1.2",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                  position: "relative",
+                }}
+                onInput={() => {
+                  document.documentElement.style.setProperty(
+                    "--text-area-height",
+                    `${st.textareaFontSize * 2}px`
+                  );
+                }}
+              />
+              {st.soundEnabled && inp.trim() && (
+                <button
+                  onClick={readFullText}
+                  className={`p-2 rounded-lg ${
+                    st.theme === "dark"
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-100"
+                      : st.theme === "high-contrast"
+                      ? "bg-yellow-300 hover:bg-yellow-400 text-black"
+                      : "bg-white hover:bg-gray-100"
+                  }`}
+                  aria-label="Leer texto"
+                >
+                  <Play size={20} />
+                </button>
+              )}
+            </div>
             <FlashOverlay active={flash} />
           </div>
         </div>
@@ -770,7 +914,7 @@ export default function VirtualKeyboard() {
           <div className="flex flex-col gap-1">
             {layout.map((row, r) => (
               <div key={r} className="flex justify-center gap-1">
-                {row.map((k, i) => (
+                {row.map((k) => (
                   <button
                     key={k}
                     aria-label={ariaLabel(k)}
@@ -798,27 +942,16 @@ export default function VirtualKeyboard() {
                         r === layout.length - 1 &&
                         st.specialKeysPosition === "bottom"
                           ? k === "␣"
-                            ? `calc(${keySize() * 7.5}px)` // 75% para la barra espaciadora
-                            : `calc(${keySize() * 2.5}px)` // 25% para el botón borrar
-                          : (k === "␣" || k === "⌫") &&
-                            st.specialKeysPosition === "sides"
-                          ? `calc(${keySize() * 2}px)` // Doble ancho para teclas especiales en los lados
-                          : `${keySize()}px`,
-                      height: keySize() + "px",
-                      fontSize: (keySize() * st.fontSize) / 100 + "px",
-                      margin: `0 ${st.spacing * 2}px`,
-                      borderRadius: "0.5rem",
-                      boxShadow:
-                        actK === k
-                          ? "inset 0 1px 2px rgba(0,0,0,0.1)"
-                          : "0 1px 2px rgba(0,0,0,0.1)",
+                            ? `calc((100% - ${st.spacing * 2}px) / 2)`
+                            : `calc((100% - ${st.spacing * 3}px) / 3)`
+                          : `calc((100% - ${
+                              st.spacing * (row.length - 1)
+                            }px) / ${row.length})`,
+                      height: keySize(),
+                      fontSize: `${(keySize() * st.fontSize) / 100}px`,
                     }}
                   >
-                    {k === "␣" ? (
-                      <div className="w-1/2 h-1 bg-current rounded-full" />
-                    ) : (
-                      k
-                    )}
+                    {k}
                   </button>
                 ))}
               </div>
