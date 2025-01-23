@@ -170,7 +170,10 @@ const useAudio = (settings: KeyboardSettings) => {
       // Cancelar cualquier pronunciación anterior
       synth.cancel();
 
-      const utterance = new SpeechSynthesisUtterance(text);
+      // Simplificar el texto para iOS (quitar "MAYÚSCULA")
+      const cleanText = text.toLowerCase().replace(/mayúscula/gi, "");
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.lang = "es-ES";
       utterance.rate = settings.voiceRate;
       utterance.volume = settings.voiceVolume;
@@ -268,12 +271,13 @@ export default function VirtualKeyboard() {
     setActK(k);
     kRef.current[k] = { startTime: Date.now() };
 
+    if (st.soundEnabled) {
+      const textToSpeak = k === "␣" ? "espacio" : k === "⌫" ? "borrar" : k;
+      const isSpecialKey = k === "␣" || k === "⌫";
+      speakKey(textToSpeak, isSpecialKey);
+    }
+
     if (st.instantInput) {
-      if (st.soundEnabled) {
-        const textToSpeak = k === "␣" ? "espacio" : k === "⌫" ? "borrar" : k;
-        const isSpecialKey = k === "␣" || k === "⌫";
-        speakKey(textToSpeak, isSpecialKey);
-      }
       triggerVibration();
       if (k === "⌫") setInp((p) => p.slice(0, -1));
       else if (k === "␣") setInp((p) => p + " ");
@@ -289,12 +293,8 @@ export default function VirtualKeyboard() {
     setActK(null);
     const dur = (Date.now() - kt.startTime) / 1e3;
     delete kRef.current[k];
+
     if (!st.instantInput && dur >= st.holdTime) {
-      if (st.soundEnabled) {
-        const textToSpeak = k === "␣" ? "espacio" : k === "⌫" ? "borrar" : k;
-        const isSpecialKey = k === "␣" || k === "⌫";
-        speakKey(textToSpeak, isSpecialKey);
-      }
       triggerVibration();
       if (k === "⌫") setInp((p) => p.slice(0, -1));
       else if (k === "␣") setInp((p) => p + " ");
