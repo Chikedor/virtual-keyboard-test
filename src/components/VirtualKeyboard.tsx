@@ -48,13 +48,13 @@ const DEFAULT: KeyboardSettings = {
   vibrationEnabled: true,
   instantInput: false,
   theme: "light",
-  fontSize: 50,
-  textareaFontSize: 16,
+  fontSize: 100,
+  textareaFontSize: 42,
   spacing: 2,
   layout: "qwerty",
-  specialKeysPosition: "bottom",
-  voiceRate: 2,
-  voiceVolume: 0.8,
+  specialKeysPosition: "sides",
+  voiceRate: 1,
+  voiceVolume: 1,
   voicePitch: 1,
 };
 
